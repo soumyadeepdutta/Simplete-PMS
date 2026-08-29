@@ -1,4 +1,4 @@
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
 import { loadEnv, parseCsv } from './config/env.js';
@@ -9,10 +9,11 @@ import { registerAuthDecorator } from './http/auth-helpers.js';
 import { registerAuthRoutes } from './http/routes-auth.js';
 import { registerApiRoutes } from './http/routes-api.js';
 import { registerDocsRoutes } from './http/routes-docs.js';
+import { registerStaticRoutes } from './http/routes-static.js';
 import { registerMcpRoutes } from './mcp/server.js';
 import { ZodError } from 'zod';
 
-export async function buildApp() {
+export async function buildApp(): Promise<FastifyInstance> {
   const env = loadEnv();
   const app = Fastify({
     logger: {
@@ -23,10 +24,14 @@ export async function buildApp() {
     connectionTimeout: 10_000,
   });
 
-  await app.register(cors, {
-    origin: parseCsv(env.CORS_ORIGIN),
-    credentials: true,
-  });
+  // Single-origin packaged mode (WEB_ROOT set) serves the SPA from the same
+  // Fastify instance, so there is no cross-origin browser request to allow.
+  if (!env.WEB_ROOT) {
+    await app.register(cors, {
+      origin: parseCsv(env.CORS_ORIGIN),
+      credentials: true,
+    });
+  }
 
   await app.register(cookie, {
     secret: env.COOKIE_SECRET,
@@ -59,10 +64,20 @@ export async function buildApp() {
   await registerApiRoutes(app);
   await registerMcpRoutes(app);
 
+  // Registered last so it only catches routes nothing above claimed.
+  if (env.WEB_ROOT) {
+    await registerStaticRoutes(app, env.WEB_ROOT);
+  }
+
   return app;
 }
 
-async function main() {
+/**
+ * Connects to Mongo, builds the app, starts listening, and wires graceful
+ * shutdown. Used directly by both `node dist/index.js` (dev/Docker) and the
+ * packaged CLI (`cli/main.ts`), which sets process.env before calling this.
+ */
+export async function start(): Promise<FastifyInstance> {
   const env = loadEnv();
   await connectDb();
   await loadAndCacheRolePermissions();
@@ -79,6 +94,8 @@ async function main() {
   await app.listen({ host: env.HOST, port: env.PORT });
   app.log.info(`Simplete API + MCP listening on ${env.HOST}:${env.PORT}`);
   app.log.info(`OpenAPI docs: ${env.PUBLIC_BASE_URL.replace(/\/$/, '')}/docs`);
+
+  return app;
 }
 
 const isDirectRun =
@@ -86,7 +103,7 @@ const isDirectRun =
   (process.argv[1].endsWith('index.ts') || process.argv[1].endsWith('index.js'));
 
 if (isDirectRun) {
-  main().catch((err) => {
+  start().catch((err) => {
     console.error(err);
     process.exit(1);
   });

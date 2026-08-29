@@ -17,6 +17,15 @@ const envSchema = z.object({
   MCP_SESSION_TTL_MINUTES: z.coerce.number().positive().default(60),
   MCP_RATE_LIMIT_RPM: z.coerce.number().nonnegative().default(120),
   MCP_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().positive().default(60),
+  // Set by the packaged CLI to the built SPA's directory; serves the frontend
+  // and API from a single origin instead of relying on the Vite dev proxy.
+  WEB_ROOT: z.string().optional(),
+  // Explicit override for the session cookie's `Secure` attribute. Unset means
+  // "derive from PUBLIC_BASE_URL's scheme" (see auth-helpers.ts).
+  SECURE_COOKIES: z
+    .string()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v === 'true' || v === '1')),
 });
 
 export type Env = z.infer<typeof envSchema>;

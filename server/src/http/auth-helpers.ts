@@ -45,11 +45,19 @@ function sessionCookieOptions(): {
   secure: boolean;
 } {
   const env = loadEnv();
+  // Browsers silently drop `Secure` cookies over plain HTTP. A packaged install
+  // runs NODE_ENV=production on http://localhost, so `secure` must be derived
+  // from the actual public URL scheme rather than NODE_ENV. SECURE_COOKIES is
+  // an explicit override for reverse-proxy setups that terminate TLS upstream.
+  const secure =
+    env.SECURE_COOKIES !== undefined
+      ? env.SECURE_COOKIES
+      : env.PUBLIC_BASE_URL.startsWith('https://');
   return {
     path: '/',
     httpOnly: true,
     sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    secure,
   };
 }
 

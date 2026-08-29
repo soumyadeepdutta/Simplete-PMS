@@ -4,6 +4,10 @@ Modern project management for self-hosted teams — Kanban, timeline, overview, 
 
 Built with **React 18**, **TypeScript**, **Tailwind CSS**, **Fastify**, and **MongoDB**.
 
+> **Beta (`0.1.0-beta.x`)** — the portable `npx simplete-pms` install path is new.
+> APIs and config may still change before 1.0. Feedback and bug reports welcome in
+> [Issues](https://github.com/soumyadeepdutta/Simplete-PMS/issues).
+
 ![Kanban board](./images/tasks-white.png)
 
 ---
@@ -47,6 +51,31 @@ Counts, completion, pipeline breakdown, and recent tasks.
 
 ## Quick start
 
+The fastest way to run Simplete: one command, any machine with **Node.js 20+**, no Docker.
+
+```bash
+npx simplete-pms@beta --mongodb-uri "mongodb://127.0.0.1:27017/simplete"
+```
+
+That serves the built SPA and the API from a single port. On first run it prompts for the
+Mongo URI if you omit `--mongodb-uri`, and persists it (plus a generated cookie secret) so
+subsequent runs just need `npx simplete-pms@beta`. Open the printed URL (default
+[http://127.0.0.1:4000](http://127.0.0.1:4000)) and create the owner account.
+
+```text
+Options:
+  --mongodb-uri <uri>   MongoDB connection string (persisted after first run)
+  --host <host>         Bind address (default: 127.0.0.1)
+  --port <port>         Port to listen on (default: 4000)
+  --open                Open the app in your default browser once ready
+```
+
+No MongoDB handy? Any free-tier [MongoDB Atlas](https://www.mongodb.com/atlas) cluster works —
+just pass its connection string as `--mongodb-uri`.
+
+<details>
+<summary><strong>Run from source (development)</strong></summary>
+
 Monorepo layout: frontend at the repo root (`src/`), API in [`server/`](./server/).
 
 ### 1. Frontend dependencies
@@ -83,6 +112,30 @@ Vite proxies `/api`, `/mcp`, `/health`, `/docs`, and `/openapi.json` to `http://
 ```bash
 npm run build
 ```
+
+### 5. Build the `npx`-installable release locally
+
+```bash
+npm run build:release        # writes ./release
+npm pack ./release           # -> simplete-pms-<version>.tgz
+npm install -g ./simplete-pms-<version>.tgz
+simplete-pms --mongodb-uri "mongodb://127.0.0.1:27017/simplete"
+```
+
+</details>
+
+---
+
+## Upgrading from an older version
+
+Password hashing moved from `argon2id` to `node:crypto` scrypt (zero native dependencies, so
+`npx simplete-pms` works on any machine without a C++ toolchain). This is a **hard cut**: existing
+accounts created before this change cannot log in afterwards, since there is no in-place rehash
+and no forgot-password flow.
+
+To recover, drop the `users` collection in your MongoDB database (e.g.
+`mongosh <uri> --eval "db.users.drop()"`). `GET /api/setup/status` will report `needsSetup: true`
+again, and the app's first-run screen lets you re-create the owner account.
 
 ---
 
@@ -256,4 +309,4 @@ AI agents       --Bearer PAT------>  MCP Streamable HTTP (/mcp)
 
 **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, `@hello-pangea/dnd`
 
-**Backend:** Fastify, MongoDB, argon2id, Streamable HTTP MCP (`@modelcontextprotocol/sdk`)
+**Backend:** Fastify, MongoDB, `node:crypto` scrypt password hashing, Streamable HTTP MCP (`@modelcontextprotocol/sdk`)

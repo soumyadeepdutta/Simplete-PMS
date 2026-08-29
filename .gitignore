@@ -19,6 +19,10 @@ build/
 vite.config.js
 vite.config.d.ts
 
+# Generated npm-publish staging directory (see scripts/build-release.mjs)
+/release/
+*.tgz
+
 # Logs
 logs/
 *.log
