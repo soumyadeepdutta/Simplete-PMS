@@ -24,6 +24,7 @@ const PermissionEnum = [
   'member:update',
   'member:remove',
   'tag:manage',
+  'milestone:manage',
   'token:manage',
   'settings:manage',
   'audit:read',
@@ -100,6 +101,7 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         '|---|---|---|---|---|',
         '| projects / columns / tasks / comments | all | all | create+update+CRUD tasks; no `project:delete` | read only |',
         '| `tag:manage` (project tag catalog) | yes | yes | no | no |',
+        '| `milestone:manage` (project milestones) | yes | yes | no | no |',
         '| `member:*` / `audit:read` | yes | yes | no | no |',
         '| `token:manage` | yes | yes | yes | no |',
         '| `settings:manage` (import) | yes | no | no | no |',
@@ -115,7 +117,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         '## MCP',
         'Streamable HTTP MCP is mounted with `app.all(\'/mcp\')` (documented as POST/GET/DELETE; Bearer PAT required).',
         'It is not a REST resource API; see the MCP tag for transport notes and tool inventory.',
-        'MCP has no `delete_subtask` tool — use REST `DELETE .../subtasks/{subtaskId}` or `update_task` with a full subtasks array.',
+        'MCP tools include whoami, project/task CRUD, bulk create/move, column lifecycle, tags, milestones, and set_task_dependencies.',
+        'PAT-only RFC 9728 metadata is at `GET /.well-known/oauth-protected-resource` (no authorization_servers).',
       ].join('\n'),
     },
     servers: [
@@ -131,6 +134,7 @@ export function buildOpenApiSpec(): Record<string, unknown> {
       { name: 'Projects', description: 'Project CRUD' },
       { name: 'Columns', description: 'Board columns and reorder' },
       { name: 'Tags', description: 'Project tag catalog (requires tag:manage)' },
+      { name: 'Milestones', description: 'Project milestones (requires milestone:manage to write)' },
       { name: 'Tasks', description: 'Tasks, moves, comments, subtasks' },
       { name: 'Members', description: 'Workspace member admin' },
       { name: 'RolePermissions', description: 'Owner-only configurable role → permission matrix' },
@@ -228,6 +232,10 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             content: { type: 'string' },
             author: ref('PublicUser'),
             createdAt: { type: 'string' },
+            editedAt: {
+              type: 'string',
+              description: 'Set when a comment activity was edited after creation',
+            },
           },
         },
         TaskAttachment: {
@@ -285,8 +293,69 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             commentsCount: { type: 'number' },
             attachmentsCount: { type: 'number' },
             order: { type: 'number' },
+            milestoneId: { type: 'string' },
+            milestone: ref('Milestone'),
+            blockedBy: { type: 'array', items: { type: 'string' } },
+            blockers: { type: 'array', items: ref('TaskBlocker') },
             createdAt: { type: 'string' },
             updatedAt: { type: 'string' },
+          },
+        },
+        Milestone: {
+          type: 'object',
+          required: ['id', 'name', 'order'],
+          properties: {
+            id: { type: 'string' },
+            name: { type: 'string' },
+            description: { type: 'string' },
+            dueDate: { type: 'string' },
+            order: { type: 'number' },
+          },
+        },
+        MilestoneSummary: {
+          allOf: [
+            { $ref: '#/components/schemas/Milestone' },
+            {
+              type: 'object',
+              required: ['taskCount', 'completedCount'],
+              properties: {
+                taskCount: { type: 'integer' },
+                completedCount: { type: 'integer' },
+              },
+            },
+          ],
+        },
+        TaskBlocker: {
+          type: 'object',
+          required: ['id', 'title', 'done'],
+          properties: {
+            id: { type: 'string' },
+            title: { type: 'string' },
+            done: { type: 'boolean' },
+          },
+        },
+        CreateMilestoneInput: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 120 },
+            description: { type: 'string' },
+            dueDate: { type: 'string' },
+          },
+        },
+        UpdateMilestoneInput: {
+          type: 'object',
+          properties: {
+            name: { type: 'string', minLength: 1, maxLength: 120 },
+            description: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+            dueDate: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+          },
+        },
+        SetTaskDependenciesInput: {
+          type: 'object',
+          required: ['blockedBy'],
+          properties: {
+            blockedBy: { type: 'array', items: { type: 'string' } },
           },
         },
         MyTask: {
@@ -349,6 +418,7 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             tasks: { type: 'array', items: ref('Task') },
             members: { type: 'array', items: ref('PublicUser') },
             availableTags: { type: 'array', items: ref('Tag') },
+            milestones: { type: 'array', items: ref('Milestone') },
             createdAt: { type: 'string' },
             updatedAt: { type: 'string' },
           },
@@ -504,10 +574,11 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         },
         ReorderColumnsInput: {
           type: 'object',
-          required: ['sourceIndex', 'destIndex'],
+          required: ['destIndex'],
           properties: {
-            sourceIndex: { type: 'integer', minimum: 0 },
-            destIndex: { type: 'integer', minimum: 0 },
+            columnId: { type: 'string', description: 'Column id to move' },
+            sourceIndex: { type: 'integer', minimum: 0, description: 'Current 0-based column index' },
+            destIndex: { type: 'integer', minimum: 0, description: 'Target 0-based index' },
           },
         },
         CreateTaskInput: {
@@ -519,10 +590,29 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             columnId: { type: 'string', minLength: 1 },
             priority: { type: 'string', enum: [...PriorityEnum], default: 'medium' },
             assigneeIds: { type: 'array', items: { type: 'string' }, default: [] },
+            assignees: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Assignee names or emails to resolve into assigneeIds.',
+            },
             tagIds: { type: 'array', items: { type: 'string' }, default: [] },
             startDate: { type: 'string' },
-            dueDate: { type: 'string' },
+            dueDate: {
+              type: 'string',
+              description: 'Task due / end date (ISO). Alias: endDate.',
+            },
+            endDate: {
+              type: 'string',
+              description: 'Alias for dueDate. Ignored when dueDate is also set.',
+            },
             estimatedHours: { type: 'number' },
+            tags: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Tag names (case-insensitive). Auto-created when caller has tag:manage.',
+            },
+            milestoneId: { type: 'string' },
+            blockedBy: { type: 'array', items: { type: 'string' } },
             subtasks: {
               type: 'array',
               items: {
@@ -533,6 +623,39 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             },
           },
         },
+        BulkCreateTasksInput: {
+          type: 'object',
+          required: ['tasks'],
+          properties: {
+            tasks: {
+              type: 'array',
+              minItems: 1,
+              maxItems: 50,
+              items: ref('CreateTaskInput'),
+            },
+          },
+        },
+        BulkCreateTasksResult: {
+          type: 'object',
+          required: ['created', 'failed', 'createdCount', 'failedCount'],
+          properties: {
+            created: { type: 'array', items: ref('Task') },
+            failed: {
+              type: 'array',
+              items: {
+                type: 'object',
+                required: ['index', 'error'],
+                properties: {
+                  index: { type: 'integer' },
+                  title: { type: 'string' },
+                  error: { type: 'string' },
+                },
+              },
+            },
+            createdCount: { type: 'integer' },
+            failedCount: { type: 'integer' },
+          },
+        },
         UpdateTaskInput: {
           type: 'object',
           properties: {
@@ -540,9 +663,24 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             description: { type: 'string' },
             priority: ref('Priority'),
             assigneeIds: { type: 'array', items: { type: 'string' } },
+            assignees: {
+              type: 'array',
+              items: { type: 'string' },
+              description: 'Assignee names or emails to resolve into assigneeIds.',
+            },
             tagIds: { type: 'array', items: { type: 'string' } },
+            tags: { type: 'array', items: { type: 'string' } },
+            milestoneId: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+            blockedBy: { type: 'array', items: { type: 'string' } },
             startDate: { oneOf: [{ type: 'string' }, { type: 'null' }] },
-            dueDate: { oneOf: [{ type: 'string' }, { type: 'null' }] },
+            dueDate: {
+              oneOf: [{ type: 'string' }, { type: 'null' }],
+              description: 'Task due / end date; null clears. Alias: endDate.',
+            },
+            endDate: {
+              oneOf: [{ type: 'string' }, { type: 'null' }],
+              description: 'Alias for dueDate; null clears. Ignored when dueDate is also set.',
+            },
             estimatedHours: { oneOf: [{ type: 'number' }, { type: 'null' }] },
             spentHours: { type: 'number' },
             subtasks: { type: 'array', items: ref('Subtask') },
@@ -565,6 +703,17 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           type: 'object',
           required: ['content'],
           properties: { content: { type: 'string', minLength: 1 } },
+        },
+        UpdateCommentInput: {
+          type: 'object',
+          required: ['content'],
+          properties: {
+            content: {
+              type: 'string',
+              minLength: 1,
+              description: 'Replacement comment text; sets editedAt on the activity',
+            },
+          },
         },
         SubtaskTitleInput: {
           type: 'object',
@@ -726,6 +875,13 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           required: true,
           schema: { type: 'string' },
         },
+        activityId: {
+          name: 'activityId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+          description: 'Comment activity id (task.activities entry with type=comment)',
+        },
         columnId: {
           name: 'columnId',
           in: 'path',
@@ -734,6 +890,12 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         },
         tagId: {
           name: 'tagId',
+          in: 'path',
+          required: true,
+          schema: { type: 'string' },
+        },
+        milestoneId: {
+          name: 'milestoneId',
           in: 'path',
           required: true,
           schema: { type: 'string' },
@@ -1056,6 +1218,97 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           },
         },
       },
+      '/api/projects/{projectId}/milestones': {
+        get: {
+          tags: ['Milestones'],
+          summary: 'List project milestones',
+          description: 'Requires `project:read`. Returns task and completion counts.',
+          operationId: 'listMilestones',
+          security: authSecurity,
+          parameters: [{ $ref: '#/components/parameters/projectId' }],
+          responses: {
+            '200': {
+              description: 'Milestones with counts',
+              ...jsonContent({ type: 'array', items: ref('MilestoneSummary') }),
+            },
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+          },
+        },
+        post: {
+          tags: ['Milestones'],
+          summary: 'Create milestone',
+          description: 'Requires `milestone:manage`.',
+          operationId: 'createMilestone',
+          security: authSecurity,
+          parameters: [{ $ref: '#/components/parameters/projectId' }],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref('CreateMilestoneInput')),
+          },
+          responses: {
+            '200': {
+              description: 'Created milestone',
+              ...jsonContent(ref('Milestone')),
+            },
+            '400': errorResponses['400'],
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+            '409': errorResponses['409'],
+          },
+        },
+      },
+      '/api/projects/{projectId}/milestones/{milestoneId}': {
+        patch: {
+          tags: ['Milestones'],
+          summary: 'Update milestone',
+          description: 'Requires `milestone:manage`.',
+          operationId: 'updateMilestone',
+          security: authSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/projectId' },
+            { $ref: '#/components/parameters/milestoneId' },
+          ],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref('UpdateMilestoneInput')),
+          },
+          responses: {
+            '200': {
+              description: 'Updated milestone',
+              ...jsonContent(ref('Milestone')),
+            },
+            '400': errorResponses['400'],
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+            '409': errorResponses['409'],
+          },
+        },
+        delete: {
+          tags: ['Milestones'],
+          summary: 'Delete milestone',
+          description:
+            'Requires `milestone:manage`. Unsets `milestoneId` on assigned tasks.',
+          operationId: 'deleteMilestone',
+          security: authSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/projectId' },
+            { $ref: '#/components/parameters/milestoneId' },
+          ],
+          responses: {
+            '200': {
+              description: 'Deleted',
+              ...jsonContent(ref('OkResponse')),
+            },
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+          },
+        },
+      },
       '/api/projects/{projectId}/columns': {
         post: {
           tags: ['Columns'],
@@ -1175,7 +1428,7 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           tags: ['Tasks'],
           summary: 'List tasks with optional filters',
           description:
-            'Requires `task:read`. Query matches `FilterStateSchema.partial()`. Array query keys (`priorities`, `assigneeIds`, `tagIds`, `columnIds`) should be repeated (`?priorities=high&priorities=low`) so Fastify yields string[]; a single value may fail Zod array validation.',
+            'Requires `task:read`. Query matches `FilterStateSchema.partial()`. Array query keys (`priorities`, `assigneeIds`, `tagIds`, `columnIds`, `milestoneIds`) should be repeated (`?priorities=high&priorities=low`) so Fastify yields string[]; a single value may fail Zod array validation.',
           operationId: 'listTasks',
           security: authSecurity,
           parameters: [
@@ -1213,6 +1466,18 @@ export function buildOpenApiSpec(): Record<string, unknown> {
               schema: { type: 'array', items: { type: 'string' } },
               style: 'form',
               explode: true,
+            },
+            {
+              name: 'milestoneIds',
+              in: 'query',
+              schema: { type: 'array', items: { type: 'string' } },
+              style: 'form',
+              explode: true,
+            },
+            {
+              name: 'blockedOnly',
+              in: 'query',
+              schema: { type: 'boolean' },
             },
             {
               name: 'dueFilter',
@@ -1263,6 +1528,31 @@ export function buildOpenApiSpec(): Record<string, unknown> {
             '200': {
               description: 'Created task',
               ...jsonContent(ref('Task')),
+            },
+            '400': errorResponses['400'],
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+          },
+        },
+      },
+      '/api/projects/{projectId}/tasks/bulk': {
+        post: {
+          tags: ['Tasks'],
+          summary: 'Bulk create tasks',
+          description:
+            'Requires `task:create`. Creates 1–50 tasks. Continues on per-item errors; returns `created` and `failed` arrays.',
+          operationId: 'createTasksBulk',
+          security: authSecurity,
+          parameters: [{ $ref: '#/components/parameters/projectId' }],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref('BulkCreateTasksInput')),
+          },
+          responses: {
+            '200': {
+              description: 'Bulk create result',
+              ...jsonContent(ref('BulkCreateTasksResult')),
             },
             '400': errorResponses['400'],
             '401': errorResponses['401'],
@@ -1339,12 +1629,40 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           },
         },
       },
+      '/api/projects/{projectId}/tasks/{taskId}/dependencies': {
+        put: {
+          tags: ['Tasks'],
+          summary: 'Set task dependencies',
+          description:
+            'Requires `task:update`. Replaces `blockedBy` with same-project predecessor ids. Rejects self-references and cycles.',
+          operationId: 'setTaskDependencies',
+          security: authSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/projectId' },
+            { $ref: '#/components/parameters/taskId' },
+          ],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref('SetTaskDependenciesInput')),
+          },
+          responses: {
+            '200': {
+              description: 'Updated task',
+              ...jsonContent(ref('Task')),
+            },
+            '400': errorResponses['400'],
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+          },
+        },
+      },
       '/api/projects/{projectId}/tasks/{taskId}/move': {
         post: {
           tags: ['Tasks'],
           summary: 'Move task to column/index',
           description:
-            'Requires `task:move`. Moving into a column whose title matches `/done/i` is rejected (400) if the task has any incomplete deliverables (subtasks). Tasks with no deliverables may move to Done freely.',
+            'Requires `task:move`. Moving into a column whose title matches `/done/i` is rejected (400) if the task has incomplete deliverables (subtasks) or unfinished blockers (`blockedBy` tasks not in a Done column).',
           operationId: 'moveTask',
           security: authSecurity,
           parameters: [
@@ -1385,6 +1703,35 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           responses: {
             '200': {
               description: 'Updated task',
+              ...jsonContent(ref('Task')),
+            },
+            '400': errorResponses['400'],
+            '401': errorResponses['401'],
+            '403': errorResponses['403'],
+            '404': errorResponses['404'],
+          },
+        },
+      },
+      '/api/projects/{projectId}/tasks/{taskId}/comments/{activityId}': {
+        patch: {
+          tags: ['Tasks'],
+          summary: 'Edit comment',
+          description:
+            'Requires `comment:create`. Only the comment author may edit. Sets `editedAt` on the activity.',
+          operationId: 'updateComment',
+          security: authSecurity,
+          parameters: [
+            { $ref: '#/components/parameters/projectId' },
+            { $ref: '#/components/parameters/taskId' },
+            { $ref: '#/components/parameters/activityId' },
+          ],
+          requestBody: {
+            required: true,
+            ...jsonContent(ref('UpdateCommentInput')),
+          },
+          responses: {
+            '200': {
+              description: 'Updated task with edited comment',
               ...jsonContent(ref('Task')),
             },
             '400': errorResponses['400'],
@@ -1754,16 +2101,25 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           description: [
             'Bearer PAT required. Registered as `app.all(\'/mcp\')` — Streamable HTTP transport.',
             'Initialize with an MCP initialize request to create a session (`mcp-session-id` response/header).',
+            'Idle sessions expire after `MCP_SESSION_TTL_MINUTES` (default 60); clients must re-initialize.',
+            'Per-token/user sliding-window rate limit: `MCP_RATE_LIMIT_RPM` (default 120; `0` disables) over `MCP_RATE_LIMIT_WINDOW_SECONDS` (default 60).',
+            'Exceeded limits return HTTP 429 with `Retry-After` and `X-RateLimit-*` headers.',
             '',
-            '**Tools (prefixed `simplete_`):** simplete_list_projects, simplete_get_project,',
+            '**Tools (prefixed `simplete_`):** simplete_whoami, simplete_list_projects, simplete_get_project,',
             'simplete_list_my_tasks, simplete_list_tasks, simplete_search_tasks, simplete_get_task,',
-            'simplete_create_task, simplete_update_task, simplete_move_task, simplete_delete_task,',
-            'simplete_add_comment, simplete_add_subtask, simplete_toggle_subtask,',
-            'simplete_create_tag, simplete_update_tag, simplete_delete_tag, simplete_list_members.',
+            'simplete_create_task, simplete_create_tasks, simplete_update_task, simplete_move_task, simplete_move_tasks, simplete_delete_task,',
+            'simplete_add_comment, simplete_update_comment, simplete_add_subtask, simplete_toggle_subtask, simplete_delete_subtask,',
+            'simplete_create_project, simplete_update_project, simplete_create_column, simplete_update_column, simplete_delete_column, simplete_reorder_columns,',
+            'simplete_list_tags, simplete_create_tag, simplete_update_tag, simplete_delete_tag,',
+            'simplete_list_milestones, simplete_create_milestone, simplete_update_milestone, simplete_delete_milestone,',
+            'simplete_set_task_dependencies, simplete_list_members.',
             '',
             'List tools support `limit`/`offset` pagination and `response_format` (`markdown`|`json`).',
+            'Task create/update accept tag names, milestoneId, blockedBy, startDate, and dueDate (the task due / end date). Bulk create is `simplete_create_tasks` (1-50, partial success). Bulk column moves are `simplete_move_tasks`.',
+            'PAT-only RFC 9728 metadata: `GET /.well-known/oauth-protected-resource` (and `.../mcp`). No `authorization_servers`; clients must send a Bearer PAT.',
+            'Comment edits via `simplete_update_comment` set `editedAt` on the activity.',
             '',
-            '**Not exposed as MCP tools:** delete_subtask, project/column/member admin, tokens, import, audit, role-permissions.',
+            '**Not exposed as MCP tools:** member admin, tokens, import, audit, role-permissions.',
             '',
             '**Resources:** `simplete://project/{projectId}`, `simplete://task/{projectId}/{taskId}`.',
             '',

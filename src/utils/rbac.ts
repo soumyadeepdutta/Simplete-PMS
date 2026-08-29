@@ -23,6 +23,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'member:update',
   'member:remove',
   'tag:manage',
+  'milestone:manage',
   'token:manage',
   'settings:manage',
   'audit:read',

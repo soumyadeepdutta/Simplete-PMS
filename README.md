@@ -1,90 +1,231 @@
-# Simplete - Modern Project Management & Kanban Platform
+# Simplete
 
-A modern, fast, and accessible Project Management & Kanban board built with **React 18**, **TypeScript**, **Tailwind CSS**, and **@hello-pangea/dnd**.
+Modern project management for self-hosted teams — Kanban, timeline, overview, RBAC, and **MCP** so AI agents can work your board over HTTP.
 
-![Simplete Kanban Preview](https://images.unsplash.com/photo-1618401471353-b98aedd04e11?w=1200&auto=format&fit=crop&q=80)
+Built with **React 18**, **TypeScript**, **Tailwind CSS**, **Fastify**, and **MongoDB**.
 
----
-
-## ✨ Features
-
-- 📋 **Multi-Project Management**: Switch between multiple workspaces and create custom project spaces.
-- 🎯 **Fluid Drag-and-Drop & Accessible Controls**:
-  - Drag tasks across columns or reorder with drop feedback.
-  - **WCAG 2.2 AA Compliance**: Non-drag single-pointer popovers and keyboard-friendly menus to move tasks between columns.
-- ⚡ **Custom Workflow Columns & WIP Limits**:
-  - Add, rename, and recolor columns.
-  - Set **Work-In-Progress (WIP) limits** with visual alert badges.
-- 📝 **Rich Task Details & Modal Editor**:
-  - Title, rich description notes, priority tags (`Urgent`, `High`, `Medium`, `Low`).
-  - Assignee selectors with member avatars.
-  - Due date tracking with countdown indicators (`Overdue`, `Due Today`, `Upcoming`).
-  - Interactive **Subtask Checklists** with progress percentage.
-  - Real-time **Comments & Activity Stream**.
-  - Time estimation vs spent hours logging.
-- 🔍 **Multi-Domain Filters & Instant Search**:
-  - Real-time search by task title, description, or tags.
-  - Priority severity pills, Assignee filters, Tag filters, and Due date selectors.
-- 📊 **Multiple Views**:
-  - **Kanban Board**: Drag-and-drop workflow cards.
-  - **Table / Spreadsheet**: High-density view with sortable columns and quick inline status changes.
-  - **Sprint Analytics**: Velocity KPIs, completion metrics, WIP distribution, and team member workload charts.
-- 💾 **Persistence & Export/Import**:
-  - Server-backed MongoDB storage with session auth.
-  - Export / import workspace JSON backups.
-- 🔐 **Auth, RBAC & MCP**:
-  - Password login, roles (`owner` / `admin` / `member` / `viewer`).
-  - Personal access tokens for HTTP MCP clients.
-- 🌓 **Dark & Light Mode**: Smooth theme toggling with semantic design system tokens.
-- 🎉 **Completion Celebrations**: Confetti particle burst when moving tasks to "Done"!
+![Kanban board](./images/tasks-white.png)
 
 ---
 
-## 🚀 Quick Start (frontend + backend)
+## Features
 
-### 1. Install frontend dependencies
+- **Multi-project workspaces** — favorites, archive, and quick project switching
+- **Kanban** — drag-and-drop columns, WIP limits, Soft UI cards
+- **Timeline & Overview** — due-date grouping and project health at a glance
+- **Table & List views** — dense sorting and a clean task list
+- **Rich tasks** — priority, tags, assignees, due dates, subtasks, comments, time tracking
+- **Filters** — search, priority, assignee, tags, due date
+- **Auth & RBAC** — owner / admin / member / viewer with permission scopes
+- **API & MCP tokens** — personal access tokens for agents and HTTP clients
+- **Light & dark themes** — semantic design tokens
+- **Export / import** — JSON workspace backups
+
+---
+
+## Views
+
+### Tasks (Kanban)
+
+Drag cards across columns, set WIP limits, and open the task modal for details.
+
+![Tasks — Kanban](./images/tasks-white.png)
+
+### Timeline
+
+Tasks grouped by due date for planning and sequencing.
+
+![Timeline](./images/timeline-white.png)
+
+### Overview
+
+Counts, completion, pipeline breakdown, and recent tasks.
+
+![Overview](./images/analytics-white.png)
+
+---
+
+## Quick start
+
+Monorepo layout: frontend at the repo root (`src/`), API in [`server/`](./server/).
+
+### 1. Frontend dependencies
+
 ```bash
 npm install
 ```
 
-### 2. Install & run the API (separate terminal)
+### 2. API (separate terminal)
+
 ```bash
 cd server
 npm install
 cp .env.example .env
-# Start MongoDB locally, then:
+# Ensure MongoDB is running, then:
 npm run dev
 ```
 
-### 3. Start the Vite app
+### 3. Vite app
+
 ```bash
 npm run dev
 ```
 
-Open `http://localhost:3000`. On first visit, create the owner account. Vite proxies `/api`, `/mcp`, `/health`, `/docs`, and `/openapi.json` to `http://127.0.0.1:4000`.
+Open [http://localhost:3000](http://localhost:3000). On first visit, create the owner account.
 
-API docs (Swagger UI): [http://localhost:4000/docs](http://localhost:4000/docs) — see [`docs/api-docs.md`](./docs/api-docs.md).
+Vite proxies `/api`, `/mcp`, `/health`, `/docs`, and `/openapi.json` to `http://127.0.0.1:4000`.
 
-### 4. Build frontend for production
+- Swagger UI: [http://localhost:4000/docs](http://localhost:4000/docs)
+- API notes: [`docs/api-docs.md`](./docs/api-docs.md)
+
+### 4. Production frontend build
+
 ```bash
 npm run build
 ```
 
 ---
 
-## Self-hosting with Docker
+## Docker
 
 ```bash
-# From repo root — starts MongoDB + API on port 4000
+# From repo root — MongoDB + API on port 4000
 docker compose up -d
-
-# Optionally set a strong cookie secret:
-# COOKIE_SECRET=... docker compose up -d
 ```
 
-Serve the Vite `dist/` behind any static host (or nginx) and point it at the API. For local UI against Docker API, keep `npm run dev` with the default proxy.
+Serve Vite `dist/` with any static host and point it at the API. For local UI against Docker, keep `npm run dev` with the default proxy.
 
-See [`server/README.md`](./server/README.md) for MCP client configuration (Bearer PAT → `POST /mcp`).
+---
+
+## Connect AI agents via MCP
+
+Simplete exposes a **Streamable HTTP** MCP server. Agents use one URL plus a personal access token (PAT).
+
+![API & MCP Tokens](./images/mcp-token-white.png)
+
+| | |
+| --- | --- |
+| **Endpoint** | `http://localhost:4000/mcp` (API) or `http://localhost:3000/mcp` (Vite proxy) |
+| **Transport** | Streamable HTTP (`POST` / `GET` / `DELETE`) |
+| **Auth** | `Authorization: Bearer tok_…` |
+| **Server name** | `simplete-mcp-server` |
+
+For production, use your public HTTPS URL and set `MCP_ALLOWED_HOSTS` / `MCP_ALLOWED_ORIGINS` in `server/.env`.
+
+Unauthenticated `GET /.well-known/oauth-protected-resource` returns PAT-only RFC 9728 metadata. **Clients still need** `Authorization: Bearer tok_…` — metadata does not replace a PAT.
+
+### 1. Create a PAT
+
+1. Sign in at `http://localhost:3000`
+2. Open **API & MCP tokens** (key icon in the icon rail)
+3. Create a token with the scopes (and optional project allow-list) you need
+4. Copy the raw token once (`tok_…`) — it is not shown again
+
+Owner / admin / member can manage tokens (`token:manage`). Effective MCP permissions = role ∩ token scopes.
+
+### 2. Cursor
+
+Project: `.cursor/mcp.json` · Global: `~/.cursor/mcp.json` (Windows: `%USERPROFILE%\.cursor\mcp.json`)
+
+```json
+{
+  "mcpServers": {
+    "simplete": {
+      "url": "http://localhost:4000/mcp",
+      "headers": {
+        "Authorization": "Bearer tok_YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+Prefer env-based secrets:
+
+```json
+{
+  "mcpServers": {
+    "simplete": {
+      "url": "http://localhost:4000/mcp",
+      "headers": {
+        "Authorization": "Bearer ${env:SIMPLETE_PAT}"
+      }
+    }
+  }
+}
+```
+
+### 3. Claude Code
+
+```bash
+claude mcp add --transport http simplete http://localhost:4000/mcp \
+  --header "Authorization: Bearer tok_YOUR_TOKEN_HERE"
+```
+
+Or project `.mcp.json` (**`type` is required**):
+
+```json
+{
+  "mcpServers": {
+    "simplete": {
+      "type": "http",
+      "url": "http://localhost:4000/mcp",
+      "headers": {
+        "Authorization": "Bearer ${SIMPLETE_PAT}"
+      }
+    }
+  }
+}
+```
+
+### 4. Claude Desktop / Connectors
+
+Remote MCP needs a reachable **HTTPS** URL for Claude.ai. For Desktop, bridge with [`mcp-remote`](https://www.npmjs.com/package/mcp-remote):
+
+```json
+{
+  "mcpServers": {
+    "simplete": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-remote",
+        "http://localhost:4000/mcp",
+        "--header",
+        "Authorization:${AUTH_HEADER}"
+      ],
+      "env": {
+        "AUTH_HEADER": "Bearer tok_YOUR_TOKEN_HERE"
+      }
+    }
+  }
+}
+```
+
+### 5. Other HTTP MCP clients
+
+```text
+URL:     http://localhost:4000/mcp
+Header:  Authorization: Bearer tok_…
+```
+
+Works with VS Code Copilot, Windsurf, MCP Inspector (`npx @modelcontextprotocol/inspector`), and the official SDK Streamable HTTP client. Add `"type": "http"` when the client requires it.
+
+### What agents can do
+
+Tools are prefixed `simplete_` (projects, tasks, comments, subtasks, tags, members, standup prompt). Full list: [`server/README.md`](./server/README.md).
+
+Project/column/member admin, token CRUD, import, and audit stay on **REST** (`/api/*`).
+
+### Troubleshooting
+
+| Symptom | Fix |
+| --- | --- |
+| `401 Unauthorized` | Missing/invalid PAT; use `Authorization: Bearer tok_…` |
+| DNS / host errors | Add host to `MCP_ALLOWED_HOSTS` (and origin to `MCP_ALLOWED_ORIGINS`) |
+| Claude.ai cannot reach server | Expose HTTPS; localhost is not reachable from Anthropic cloud |
+| Claude Code: `url` but no `type` | Add `"type": "http"` |
+| Tools missing / permission denied | Widen PAT scopes or use a stronger role |
 
 ---
 
@@ -101,6 +242,18 @@ AI agents       --Bearer PAT------>  MCP Streamable HTTP (/mcp)
                    MongoDB
 ```
 
-- Backend: [`server/`](./server/) (Fastify, MongoDB driver, argon2id, Streamable HTTP MCP)
-- Frontend API client: [`src/services/api.ts`](./src/services/api.ts)
-- Shared shapes: [`src/types/kanban.ts`](./src/types/kanban.ts) (wire-compatible with server Zod schemas)
+| Path | Role |
+| --- | --- |
+| [`src/`](./src/) | React SPA |
+| [`server/`](./server/) | Fastify API + MCP |
+| [`src/services/api.ts`](./src/services/api.ts) | Frontend API client |
+| [`src/types/kanban.ts`](./src/types/kanban.ts) | Shared shapes (wire-compatible with server Zod) |
+| [`docs/`](./docs/) | API docs and user stories |
+
+---
+
+## Stack
+
+**Frontend:** React 18, TypeScript, Vite, Tailwind CSS, `@hello-pangea/dnd`
+
+**Backend:** Fastify, MongoDB, argon2id, Streamable HTTP MCP (`@modelcontextprotocol/sdk`)

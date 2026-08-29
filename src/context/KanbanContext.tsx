@@ -16,9 +16,11 @@ import { projectApi } from '../services/apiMock';
 import { getPriorityWeight } from '../utils/priorityUtils';
 import { getDueStatus } from '../utils/dateUtils';
 import {
+  assigneeRequiredForInProgressMessage,
   deliverablesBlockDoneMessage,
   incompleteDeliverableCount,
   isDoneColumnTitle,
+  isInProgressColumnTitle,
 } from '../utils/taskStatus';
 import { useAuth } from './AuthContext';
 import { ApiError } from '../services/api';
@@ -111,6 +113,8 @@ const DEFAULT_FILTERS: FilterState = {
   assigneeIds: [],
   tagIds: [],
   columnIds: [],
+  milestoneIds: [],
+  blockedOnly: false,
   dueFilter: 'all',
   sortBy: 'order',
   sortOrder: 'asc',
@@ -271,6 +275,12 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (filters.columnIds.length > 0) {
       list = list.filter((t) => filters.columnIds.includes(t.columnId));
     }
+    if (filters.milestoneIds && filters.milestoneIds.length > 0) {
+      list = list.filter((t) => t.milestoneId && filters.milestoneIds!.includes(t.milestoneId));
+    }
+    if (filters.blockedOnly) {
+      list = list.filter((t) => (t.blockers ?? []).some((b) => !b.done));
+    }
     if (filters.dueFilter !== 'all') {
       list = list.filter((t) => {
         const status = getDueStatus(t.dueDate);
@@ -312,6 +322,14 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!task) return;
 
     const destCol = activeProject.columns.find((c) => c.id === destColId);
+    if (destCol && isInProgressColumnTitle(destCol.title) && sourceColId !== destColId) {
+      const assignees = task.assignees ?? [];
+      if (assignees.length === 0) {
+        showToast(assigneeRequiredForInProgressMessage(), 'warning');
+        return;
+      }
+    }
+
     if (destCol && isDoneColumnTitle(destCol.title) && sourceColId !== destColId) {
       const incomplete = incompleteDeliverableCount(task.subtasks);
       if (incomplete > 0) {

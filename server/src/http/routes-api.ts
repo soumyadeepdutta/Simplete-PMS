@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import * as projects from '../domain/projects.js';
 import * as tasks from '../domain/tasks.js';
 import * as tags from '../domain/tags.js';
+import * as milestones from '../domain/milestones.js';
 import * as members from '../domain/members.js';
 import * as audit from '../domain/audit.js';
 import * as rolePermissions from '../domain/rolePermissions.js';
@@ -25,7 +26,12 @@ import {
   UpdateMemberInputSchema,
   CreateTagInputSchema,
   UpdateTagInputSchema,
+  CreateMilestoneInputSchema,
+  UpdateMilestoneInputSchema,
+  SetTaskDependenciesInputSchema,
   FilterStateSchema,
+  BulkCreateTasksInputSchema,
+  UpdateCommentInputSchema,
 } from '../shared/schemas.js';
 import { z } from 'zod';
 import { requireAuthHook } from './auth-helpers.js';
@@ -84,6 +90,46 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     }
   );
 
+  // Milestones
+  app.get<{ Params: { projectId: string } }>(
+    '/api/projects/:projectId/milestones',
+    auth,
+    async (req) => milestones.listMilestones(req.auth!, req.params.projectId)
+  );
+  app.post<{ Params: { projectId: string } }>(
+    '/api/projects/:projectId/milestones',
+    auth,
+    async (req) => {
+      const result = await milestones.createMilestone(
+        req.auth!,
+        req.params.projectId,
+        CreateMilestoneInputSchema.parse(req.body)
+      );
+      return result.milestone;
+    }
+  );
+  app.patch<{ Params: { projectId: string; milestoneId: string } }>(
+    '/api/projects/:projectId/milestones/:milestoneId',
+    auth,
+    async (req) => {
+      const result = await milestones.updateMilestone(
+        req.auth!,
+        req.params.projectId,
+        req.params.milestoneId,
+        UpdateMilestoneInputSchema.parse(req.body)
+      );
+      return result.milestone;
+    }
+  );
+  app.delete<{ Params: { projectId: string; milestoneId: string } }>(
+    '/api/projects/:projectId/milestones/:milestoneId',
+    auth,
+    async (req) => {
+      await milestones.deleteMilestone(req.auth!, req.params.projectId, req.params.milestoneId);
+      return { ok: true };
+    }
+  );
+
   // Columns
   app.post<{ Params: { projectId: string } }>(
     '/api/projects/:projectId/columns',
@@ -115,9 +161,17 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     auth,
     async (req) => {
       const body = z
-        .object({ sourceIndex: z.number().int().min(0), destIndex: z.number().int().min(0) })
+        .object({
+          columnId: z.string().optional(),
+          sourceIndex: z.number().int().min(0).optional(),
+          destIndex: z.number().int().min(0),
+        })
+        .refine((d) => d.columnId !== undefined || d.sourceIndex !== undefined, {
+          message: 'Either columnId or sourceIndex is required',
+        })
         .parse(req.body);
-      return projects.moveColumn(req.auth!, req.params.projectId, body.sourceIndex, body.destIndex);
+      const source = body.columnId ?? body.sourceIndex!;
+      return projects.moveColumn(req.auth!, req.params.projectId, source, body.destIndex);
     }
   );
 
@@ -142,6 +196,16 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     async (req) =>
       tasks.createTask(req.auth!, req.params.projectId, CreateTaskInputSchema.parse(req.body))
   );
+  app.post<{ Params: { projectId: string } }>(
+    '/api/projects/:projectId/tasks/bulk',
+    auth,
+    async (req) =>
+      tasks.createTasks(
+        req.auth!,
+        req.params.projectId,
+        BulkCreateTasksInputSchema.parse(req.body)
+      )
+  );
   app.patch<{ Params: { projectId: string; taskId: string } }>(
     '/api/projects/:projectId/tasks/:taskId',
     auth,
@@ -164,6 +228,17 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
         MoveTaskInputSchema.parse(req.body)
       )
   );
+  app.put<{ Params: { projectId: string; taskId: string } }>(
+    '/api/projects/:projectId/tasks/:taskId/dependencies',
+    auth,
+    async (req) =>
+      tasks.setTaskDependencies(
+        req.auth!,
+        req.params.projectId,
+        req.params.taskId,
+        SetTaskDependenciesInputSchema.parse(req.body)
+      )
+  );
   app.delete<{ Params: { projectId: string; taskId: string } }>(
     '/api/projects/:projectId/tasks/:taskId',
     auth,
@@ -178,6 +253,20 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const body = z.object({ content: z.string().min(1) }).parse(req.body);
       return tasks.addComment(req.auth!, req.params.projectId, req.params.taskId, body.content);
+    }
+  );
+  app.patch<{ Params: { projectId: string; taskId: string; activityId: string } }>(
+    '/api/projects/:projectId/tasks/:taskId/comments/:activityId',
+    auth,
+    async (req) => {
+      const body = UpdateCommentInputSchema.parse(req.body);
+      return tasks.updateComment(
+        req.auth!,
+        req.params.projectId,
+        req.params.taskId,
+        req.params.activityId,
+        body.content
+      );
     }
   );
   app.post<{ Params: { projectId: string; taskId: string } }>(

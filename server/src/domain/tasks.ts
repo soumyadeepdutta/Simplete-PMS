@@ -1,24 +1,35 @@
 import { cols } from '../db/client.js';
-import type { ActivityDoc, TaskDoc } from '../db/types.js';
+import type { ActivityDoc, ProjectDoc, TaskDoc } from '../db/types.js';
 import type { AuthContext } from '../auth/rbac.js';
 import { can, requirePerm } from '../auth/rbac.js';
 import { writeAudit } from './audit.js';
 import { getProjectDoc } from './projects.js';
-import { hydrateTask, loadUsersByIds } from './hydrate.js';
+import { blockersFromDocs, hydrateTask, loadTaskDocsByIds, loadUsersByIds } from './hydrate.js';
 import { needsReindex, orderBetween, reindexOrders } from './ordering.js';
-import { assertDeliverablesAllowDone, isDoneColumnTitle } from './taskStatus.js';
+import {
+  assertAssigneeAllowsInProgress,
+  assertBlockersAllowDone,
+  assertDeliverablesAllowDone,
+  isDoneColumnTitle,
+  isInProgressColumnTitle,
+} from './taskStatus.js';
+import { assertValidBlockedBy } from './dependencies.js';
+import { assertValidMilestoneId } from './milestones.js';
 import { newId } from '../shared/id.js';
-import { badRequest, notFound } from '../shared/errors.js';
+import { badRequest, forbidden, isAppError, notFound } from '../shared/errors.js';
+import type { Tag } from '../shared/schemas.js';
 import {
   CreateTaskInputSchema,
+  BulkCreateTasksInputSchema,
   UpdateTaskInputSchema,
+  UpdateCommentInputSchema,
   MoveTaskInputSchema,
   FilterStateSchema,
-  type CreateTaskInput,
-  type UpdateTaskInput,
+  SetTaskDependenciesInputSchema,
   type MoveTaskInput,
   type FilterState,
   type Subtask,
+  type Task,
 } from '../shared/schemas.js';
 
 function priorityWeight(p: string): number {
@@ -56,6 +67,90 @@ function assertValidTagIds(availableTags: { id: string }[], tagIds: string[]): v
   if (unknown.length) {
     throw badRequest(`Unknown tag id(s): ${unknown.join(', ')}`);
   }
+}
+
+async function resolveTagIds(
+  ctx: AuthContext,
+  project: ProjectDoc,
+  tagIds: string[] | undefined,
+  tagNames: string[] | undefined
+): Promise<{ tagIds: string[]; project: ProjectDoc }> {
+  const resolved = new Set(tagIds ?? []);
+  if (tagIds?.length) {
+    assertValidTagIds(project.availableTags, tagIds);
+  }
+
+  const names = (tagNames ?? []).map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0) {
+    return { tagIds: [...resolved], project };
+  }
+
+  const byName = new Map(
+    project.availableTags.map((t) => [t.name.trim().toLowerCase(), t] as const)
+  );
+  const unknown: string[] = [];
+  for (const name of names) {
+    const existing = byName.get(name.toLowerCase());
+    if (existing) {
+      resolved.add(existing.id);
+    } else {
+      unknown.push(name);
+    }
+  }
+
+  if (unknown.length === 0) {
+    return { tagIds: [...resolved], project };
+  }
+
+  if (!can(ctx, 'tag:manage', project._id)) {
+    throw forbidden(
+      `Unknown tag name(s): ${unknown.join(', ')}. Create them first or regenerate the token with tag:manage.`
+    );
+  }
+
+  const created: Tag[] = unknown.map((name) => ({ id: newId('tag'), name }));
+  const availableTags = [...project.availableTags, ...created];
+  const result = await cols().projects.findOneAndUpdate(
+    { _id: project._id },
+    { $set: { availableTags, updatedAt: new Date().toISOString() } },
+    { returnDocument: 'after' }
+  );
+  if (!result) throw notFound('Project not found');
+  for (const tag of created) resolved.add(tag.id);
+  await writeAudit(ctx, {
+    action: 'tag.create',
+    resourceType: 'tag',
+    projectId: project._id,
+    meta: { names: unknown, autoCreated: true },
+  });
+  return { tagIds: [...resolved], project: result };
+}
+
+async function resolveAssigneeIds(
+  assigneeIds: string[] | undefined,
+  assigneeNamesOrEmails: string[] | undefined
+): Promise<string[]> {
+  const resolved = new Set(assigneeIds ?? []);
+  const namesOrEmails = (assigneeNamesOrEmails ?? []).map((s) => s.trim()).filter(Boolean);
+  if (namesOrEmails.length === 0) {
+    return [...resolved];
+  }
+
+  const activeUsers = await cols().users.find({ disabled: { $ne: true } }).toArray();
+  for (const query of namesOrEmails) {
+    const qLower = query.toLowerCase();
+    const match = activeUsers.find(
+      (u) =>
+        u._id === query ||
+        u.email.toLowerCase() === qLower ||
+        u.name.toLowerCase() === qLower
+    );
+    if (!match) {
+      throw badRequest(`Unknown assignee: "${query}". Discover members via simplete_list_members.`);
+    }
+    resolved.add(match._id);
+  }
+  return [...resolved];
 }
 
 async function appendActivity(
@@ -123,6 +218,21 @@ export async function listTasks(
   if (filters.columnIds.length) {
     taskDocs = taskDocs.filter((t) => filters.columnIds.includes(t.columnId));
   }
+  if (filters.milestoneIds.length) {
+    taskDocs = taskDocs.filter((t) => t.milestoneId && filters.milestoneIds.includes(t.milestoneId));
+  }
+  if (filters.blockedOnly) {
+    const doneIds = new Set(
+      project.columns.filter((c) => isDoneColumnTitle(c.title)).map((c) => c.id)
+    );
+    const byId = new Map(taskDocs.map((t) => [t._id, t]));
+    taskDocs = taskDocs.filter((t) =>
+      (t.blockedBy ?? []).some((id) => {
+        const blocker = byId.get(id);
+        return Boolean(blocker && !doneIds.has(blocker.columnId));
+      })
+    );
+  }
   if (filters.dueFilter !== 'all') {
     taskDocs = taskDocs.filter((t) => {
       const status = dueStatus(t.dueDate);
@@ -164,20 +274,30 @@ export async function listTasks(
   }, new Map<string, ActivityDoc[]>());
 
   const userMap = await loadUsersByIds(taskDocs.flatMap((t) => t.assigneeIds));
+  const extraBlockerIds = taskDocs.flatMap((t) => t.blockedBy ?? []);
+  const blockerDocs = await loadTaskDocsByIds(extraBlockerIds);
+  for (const t of taskDocs) blockerDocs.set(t._id, t);
   return Promise.all(
-    taskDocs.map((t) => hydrateTask(t, project, userMap, byTask.get(t._id) ?? []))
+    taskDocs.map((t) => hydrateTask(t, project, userMap, byTask.get(t._id) ?? [], blockerDocs))
   );
 }
 
-export async function getTask(ctx: AuthContext, projectId: string, taskId: string) {
+export type TaskReadOptions = { includeActivities?: boolean };
+
+export async function getTask(
+  ctx: AuthContext,
+  projectId: string,
+  taskId: string,
+  options: TaskReadOptions = {}
+) {
   requirePerm(ctx, 'task:read', projectId);
   const project = await getProjectDoc(projectId);
   const task = await cols().tasks.findOne({ _id: taskId, projectId });
   if (!task) throw notFound('Task not found');
-  const acts = await cols()
-    .activities.find({ taskId })
-    .sort({ createdAt: -1 })
-    .toArray();
+  const acts =
+    options.includeActivities === false
+      ? []
+      : await cols().activities.find({ taskId }).sort({ createdAt: -1 }).toArray();
   return hydrateTask(task, project, undefined, acts);
 }
 
@@ -241,15 +361,30 @@ export async function listMyTasks(ctx: AuthContext) {
   return { tasks: hydrated };
 }
 
-export async function createTask(ctx: AuthContext, projectId: string, raw: CreateTaskInput) {
+export async function createTask(
+  ctx: AuthContext,
+  projectId: string,
+  raw: unknown,
+  options: TaskReadOptions = {}
+) {
   requirePerm(ctx, 'task:create', projectId);
   const input = CreateTaskInputSchema.parse(raw);
-  const project = await getProjectDoc(projectId);
+  let project = await getProjectDoc(projectId);
   const destColumn = project.columns.find((c) => c.id === input.columnId);
   if (!destColumn) {
     throw badRequest('Invalid columnId');
   }
-  assertValidTagIds(project.availableTags, input.tagIds);
+  const resolvedAssigneeIds = await resolveAssigneeIds(input.assigneeIds, input.assignees);
+  if (isInProgressColumnTitle(destColumn.title)) {
+    assertAssigneeAllowsInProgress(resolvedAssigneeIds);
+  }
+  const resolvedTags = await resolveTagIds(ctx, project, input.tagIds, input.tags);
+  project = resolvedTags.project;
+  assertValidMilestoneId(project.milestones, input.milestoneId);
+  const taskId = newId('task');
+  const blockedBy = input.blockedBy
+    ? await assertValidBlockedBy(projectId, taskId, input.blockedBy)
+    : [];
 
   const siblings = await cols()
     .tasks.find({ projectId, columnId: input.columnId })
@@ -258,25 +393,35 @@ export async function createTask(ctx: AuthContext, projectId: string, raw: Creat
     .toArray();
   const maxOrder = siblings[0]?.order ?? 0;
   const now = new Date().toISOString();
-  const subtasks: Subtask[] = (input.subtasks ?? []).map((s) => ({
-    id: newId('sub'),
-    title: s.title,
-    completed: false,
-  }));
+  const subtasks: Subtask[] = (input.subtasks && input.subtasks.length > 0)
+    ? input.subtasks.map((s) => ({
+        id: newId('sub'),
+        title: s.title,
+        completed: false,
+      }))
+    : [
+        {
+          id: newId('sub'),
+          title: input.title,
+          completed: false,
+        },
+      ];
 
   if (isDoneColumnTitle(destColumn.title)) {
     assertDeliverablesAllowDone(subtasks);
+    const blockerDocs = await loadTaskDocsByIds(blockedBy);
+    assertBlockersAllowDone(blockersFromDocs(project, blockedBy, blockerDocs));
   }
 
   const doc: TaskDoc = {
-    _id: newId('task'),
+    _id: taskId,
     projectId,
     title: input.title,
     description: input.description,
     columnId: input.columnId,
     priority: input.priority,
-    assigneeIds: input.assigneeIds,
-    tagIds: input.tagIds,
+    assigneeIds: resolvedAssigneeIds,
+    tagIds: resolvedTags.tagIds,
     startDate: input.startDate,
     dueDate: input.dueDate,
     estimatedHours: input.estimatedHours,
@@ -285,6 +430,8 @@ export async function createTask(ctx: AuthContext, projectId: string, raw: Creat
     order: maxOrder + 1,
     createdAt: now,
     updatedAt: now,
+    ...(input.milestoneId ? { milestoneId: input.milestoneId } : {}),
+    ...(blockedBy.length ? { blockedBy } : {}),
   };
   await cols().tasks.insertOne(doc);
   await appendActivity(doc._id, projectId, ctx.userId, 'created', 'Task created');
@@ -294,31 +441,117 @@ export async function createTask(ctx: AuthContext, projectId: string, raw: Creat
     resourceId: doc._id,
     projectId,
   });
-  return getTask(ctx, projectId, doc._id);
+  return getTask(ctx, projectId, doc._id, options);
+}
+
+export type BulkCreateTasksResult = {
+  created: Task[];
+  failed: { index: number; title?: string; error: string }[];
+  createdCount: number;
+  failedCount: number;
+};
+
+/**
+ * Create up to 50 tasks in one call. Continues on per-item errors and returns
+ * both successes and failures so agents can retry only what failed.
+ */
+export async function createTasks(
+  ctx: AuthContext,
+  projectId: string,
+  raw: unknown
+): Promise<BulkCreateTasksResult> {
+  requirePerm(ctx, 'task:create', projectId);
+  const input = BulkCreateTasksInputSchema.parse(raw);
+  const created: Task[] = [];
+  const failed: BulkCreateTasksResult['failed'] = [];
+
+  for (let i = 0; i < input.tasks.length; i++) {
+    const item = input.tasks[i]!;
+    try {
+      created.push(await createTask(ctx, projectId, item, { includeActivities: false }));
+    } catch (err) {
+      const message = isAppError(err)
+        ? err.message
+        : err instanceof Error
+          ? err.message
+          : 'Unknown error';
+      failed.push({ index: i, title: item.title, error: message });
+    }
+  }
+
+  await writeAudit(ctx, {
+    action: 'task.bulk_create',
+    resourceType: 'project',
+    resourceId: projectId,
+    projectId,
+    meta: { createdCount: created.length, failedCount: failed.length },
+  });
+
+  return {
+    created,
+    failed,
+    createdCount: created.length,
+    failedCount: failed.length,
+  };
 }
 
 export async function updateTask(
   ctx: AuthContext,
   projectId: string,
   taskId: string,
-  raw: UpdateTaskInput
+  raw: unknown,
+  options: TaskReadOptions = {}
 ) {
   requirePerm(ctx, 'task:update', projectId);
   const input = UpdateTaskInputSchema.parse(raw);
   const existing = await cols().tasks.findOne({ _id: taskId, projectId });
   if (!existing) throw notFound('Task not found');
 
-  if (input.tagIds !== undefined) {
-    const project = await getProjectDoc(projectId);
-    assertValidTagIds(project.availableTags, input.tagIds);
+  let project: ProjectDoc | undefined;
+  if (input.tagIds !== undefined || input.tags !== undefined || input.milestoneId !== undefined) {
+    project = await getProjectDoc(projectId);
+  }
+
+  let nextTagIds: string[] | undefined;
+  if (input.tagIds !== undefined || input.tags !== undefined) {
+    const resolved = await resolveTagIds(
+      ctx,
+      project ?? (await getProjectDoc(projectId)),
+      input.tagIds ?? existing.tagIds,
+      input.tags
+    );
+    project = resolved.project;
+    nextTagIds = resolved.tagIds;
+  }
+
+  if (input.milestoneId !== undefined) {
+    assertValidMilestoneId((project ?? (await getProjectDoc(projectId))).milestones, input.milestoneId);
+  }
+
+  let nextBlockedBy: string[] | undefined;
+  if (input.blockedBy !== undefined) {
+    nextBlockedBy = await assertValidBlockedBy(projectId, taskId, input.blockedBy);
+  }
+
+  let nextAssigneeIds: string[] | undefined;
+  if (input.assigneeIds !== undefined || input.assignees !== undefined) {
+    nextAssigneeIds = await resolveAssigneeIds(
+      input.assigneeIds ?? (input.assignees !== undefined ? [] : existing.assigneeIds),
+      input.assignees
+    );
+    const currentProj = project ?? (await getProjectDoc(projectId));
+    const currentCol = currentProj.columns.find((c) => c.id === existing.columnId);
+    if (currentCol && isInProgressColumnTitle(currentCol.title)) {
+      assertAssigneeAllowsInProgress(nextAssigneeIds);
+    }
   }
 
   const $set: Record<string, unknown> = { updatedAt: new Date().toISOString() };
   if (input.title !== undefined) $set.title = input.title;
   if (input.description !== undefined) $set.description = input.description;
   if (input.priority !== undefined) $set.priority = input.priority;
-  if (input.assigneeIds !== undefined) $set.assigneeIds = input.assigneeIds;
-  if (input.tagIds !== undefined) $set.tagIds = input.tagIds;
+  if (nextAssigneeIds !== undefined) $set.assigneeIds = nextAssigneeIds;
+  if (nextTagIds !== undefined) $set.tagIds = nextTagIds;
   if (input.startDate !== undefined && input.startDate !== null) $set.startDate = input.startDate;
   if (input.dueDate !== undefined && input.dueDate !== null) $set.dueDate = input.dueDate;
   if (input.estimatedHours !== undefined && input.estimatedHours !== null) {
@@ -327,18 +560,21 @@ export async function updateTask(
   if (input.spentHours !== undefined) $set.spentHours = input.spentHours;
   if (input.subtasks !== undefined) $set.subtasks = input.subtasks;
   if (input.attachments !== undefined) $set.attachments = input.attachments;
+  if (input.milestoneId) $set.milestoneId = input.milestoneId;
+  if (nextBlockedBy !== undefined) $set.blockedBy = nextBlockedBy;
 
   const $unset: Record<string, ''> = {};
   if (input.startDate === null) $unset.startDate = '';
   if (input.dueDate === null) $unset.dueDate = '';
   if (input.estimatedHours === null) $unset.estimatedHours = '';
+  if (input.milestoneId === null) $unset.milestoneId = '';
 
   await cols().tasks.updateOne(
     { _id: taskId },
     Object.keys($unset).length ? { $set, $unset } : { $set }
   );
 
-  if (input.assigneeIds !== undefined) {
+  if (nextAssigneeIds !== undefined) {
     await appendActivity(taskId, projectId, ctx.userId, 'assignee_change', 'Assignees updated');
   }
   await writeAudit(ctx, {
@@ -347,14 +583,15 @@ export async function updateTask(
     resourceId: taskId,
     projectId,
   });
-  return getTask(ctx, projectId, taskId);
+  return getTask(ctx, projectId, taskId, options);
 }
 
 export async function moveTask(
   ctx: AuthContext,
   projectId: string,
   taskId: string,
-  raw: MoveTaskInput
+  raw: MoveTaskInput,
+  options: TaskReadOptions = {}
 ) {
   requirePerm(ctx, 'task:move', projectId);
   const input = MoveTaskInputSchema.parse(raw);
@@ -367,8 +604,14 @@ export async function moveTask(
   const task = await cols().tasks.findOne({ _id: taskId, projectId });
   if (!task) throw notFound('Task not found');
 
+  if (isInProgressColumnTitle(destColumn.title) && task.columnId !== input.columnId) {
+    assertAssigneeAllowsInProgress(task.assigneeIds);
+  }
+
   if (isDoneColumnTitle(destColumn.title) && task.columnId !== input.columnId) {
     assertDeliverablesAllowDone(task.subtasks);
+    const blockerDocs = await loadTaskDocsByIds(task.blockedBy ?? []);
+    assertBlockersAllowDone(blockersFromDocs(project, task.blockedBy, blockerDocs));
   }
 
   const destTasks = await cols()
@@ -422,7 +665,33 @@ export async function moveTask(
     projectId,
     meta: { fromCol, toCol: input.columnId, index: input.index },
   });
-  return getTask(ctx, projectId, taskId);
+  return getTask(ctx, projectId, taskId, options);
+}
+
+export async function setTaskDependencies(
+  ctx: AuthContext,
+  projectId: string,
+  taskId: string,
+  raw: unknown,
+  options: TaskReadOptions = {}
+) {
+  requirePerm(ctx, 'task:update', projectId);
+  const input = SetTaskDependenciesInputSchema.parse(raw);
+  const existing = await cols().tasks.findOne({ _id: taskId, projectId });
+  if (!existing) throw notFound('Task not found');
+  const blockedBy = await assertValidBlockedBy(projectId, taskId, input.blockedBy);
+  await cols().tasks.updateOne(
+    { _id: taskId },
+    { $set: { blockedBy, updatedAt: new Date().toISOString() } }
+  );
+  await writeAudit(ctx, {
+    action: 'task.set_dependencies',
+    resourceType: 'task',
+    resourceId: taskId,
+    projectId,
+    meta: { blockedBy },
+  });
+  return getTask(ctx, projectId, taskId, options);
 }
 
 export async function deleteTask(ctx: AuthContext, projectId: string, taskId: string) {
@@ -454,6 +723,49 @@ export async function addComment(
     resourceType: 'task',
     resourceId: taskId,
     projectId,
+  });
+  return getTask(ctx, projectId, taskId);
+}
+
+export async function updateComment(
+  ctx: AuthContext,
+  projectId: string,
+  taskId: string,
+  activityId: string,
+  rawContent: string
+) {
+  requirePerm(ctx, 'comment:create', projectId);
+  const { content } = UpdateCommentInputSchema.parse({ content: rawContent });
+  const trimmed = content.trim();
+  if (!trimmed) throw badRequest('Comment cannot be empty');
+
+  const task = await cols().tasks.findOne({ _id: taskId, projectId });
+  if (!task) throw notFound('Task not found');
+
+  const activity = await cols().activities.findOne({
+    _id: activityId,
+    taskId,
+    projectId,
+  });
+  if (!activity) throw notFound('Comment not found');
+  if (activity.type !== 'comment') {
+    throw badRequest('Only comment activities can be edited');
+  }
+  if (activity.authorId !== ctx.userId) {
+    throw forbidden('Only the comment author can edit this comment');
+  }
+
+  const editedAt = new Date().toISOString();
+  await cols().activities.updateOne(
+    { _id: activityId },
+    { $set: { content: trimmed, editedAt } }
+  );
+  await writeAudit(ctx, {
+    action: 'comment.update',
+    resourceType: 'task',
+    resourceId: taskId,
+    projectId,
+    meta: { activityId, editedAt },
   });
   return getTask(ctx, projectId, taskId);
 }

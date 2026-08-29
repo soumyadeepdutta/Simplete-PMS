@@ -24,6 +24,7 @@ const GROUPS: { label: string; perms: Permission[] }[] = [
     perms: ['member:invite', 'member:update', 'member:remove'],
   },
   { label: 'Tag', perms: ['tag:manage'] },
+  { label: 'Milestone', perms: ['milestone:manage'] },
   { label: 'Token', perms: ['token:manage'] },
   { label: 'Settings', perms: ['settings:manage'] },
   { label: 'Audit', perms: ['audit:read'] },

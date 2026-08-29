@@ -14,6 +14,9 @@ const envSchema = z.object({
   MCP_ALLOWED_HOSTS: z.string().default('localhost:4000,127.0.0.1:4000'),
   MCP_ALLOWED_ORIGINS: z.string().default('http://localhost:3000,http://localhost:4000'),
   PUBLIC_BASE_URL: z.string().default('http://localhost:4000'),
+  MCP_SESSION_TTL_MINUTES: z.coerce.number().positive().default(60),
+  MCP_RATE_LIMIT_RPM: z.coerce.number().nonnegative().default(120),
+  MCP_RATE_LIMIT_WINDOW_SECONDS: z.coerce.number().positive().default(60),
 });
 
 export type Env = z.infer<typeof envSchema>;

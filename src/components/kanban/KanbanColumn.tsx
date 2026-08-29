@@ -69,8 +69,8 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-[300px] sm:w-80 shrink-0 max-h-full group/column">
-      <div className="px-1 pb-3 flex items-center justify-between gap-2">
+    <div className="flex flex-col w-[300px] sm:w-80 shrink-0 h-full min-h-0 group/column">
+      <div className="px-1 pb-3 flex items-center justify-between gap-2 shrink-0">
         <div className="flex items-center gap-2 min-w-0 flex-1">
           {canUpdate && dragHandleProps ? (
             <button
@@ -251,7 +251,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             ref={provided.innerRef}
             {...provided.droppableProps}
             className={cn(
-              'flex-1 overflow-y-auto space-y-3 min-h-[160px] transition-colors rounded-2xl p-1',
+              'flex-1 min-h-0 overflow-y-auto overflow-x-hidden space-y-3 transition-colors rounded-2xl p-1',
               snapshot.isDraggingOver && 'bg-accent-blue-soft/40'
             )}
           >
@@ -279,7 +279,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
       </Droppable>
 
       {canCreateTask && (
-        <div className="pt-2">
+        <div className="pt-2 shrink-0">
           <button
             type="button"
             onClick={() => openNewTaskModal(column.id)}

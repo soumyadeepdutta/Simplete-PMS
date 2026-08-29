@@ -67,6 +67,8 @@ const ImportTaskSchema = z.object({
     )
     .optional(),
   order: z.number().default(0),
+  milestoneId: z.string().optional(),
+  blockedBy: z.array(z.string()).optional(),
   createdAt: z.string().optional(),
   updatedAt: z.string().optional(),
 });
@@ -98,6 +100,17 @@ const ImportProjectSchema = z.object({
         color: z.string().optional(),
         bgColor: z.string().optional(),
         textColor: z.string().optional(),
+      })
+    )
+    .default([]),
+  milestones: z
+    .array(
+      z.object({
+        id: z.string(),
+        name: z.string(),
+        description: z.string().optional(),
+        dueDate: z.string().optional(),
+        order: z.number().default(0),
       })
     )
     .default([]),
@@ -172,6 +185,7 @@ export async function importProjects(ctx: AuthContext, raw: unknown) {
       category: p.category,
       columns: p.columns,
       availableTags: p.availableTags,
+      milestones: p.milestones,
       members: memberIds.map((userId) => ({ userId })),
       createdAt: p.createdAt ?? now,
       updatedAt: p.updatedAt ?? now,
@@ -204,6 +218,8 @@ export async function importProjects(ctx: AuthContext, raw: unknown) {
         order: t.order,
         createdAt: t.createdAt ?? now,
         updatedAt: t.updatedAt ?? now,
+        ...(t.milestoneId ? { milestoneId: t.milestoneId } : {}),
+        ...(t.blockedBy?.length ? { blockedBy: t.blockedBy } : {}),
       };
       await cols().tasks.insertOne(taskDoc);
 
@@ -217,6 +233,9 @@ export async function importProjects(ctx: AuthContext, raw: unknown) {
           content: a.content,
           authorId,
           createdAt: a.createdAt,
+          ...((a as { editedAt?: string }).editedAt
+            ? { editedAt: (a as { editedAt?: string }).editedAt }
+            : {}),
         };
         await cols().activities.insertOne(act);
       }

@@ -29,10 +29,38 @@ export async function getProjectDoc(projectId: string): Promise<ProjectDoc> {
   return doc;
 }
 
-export async function listProjects(ctx: AuthContext) {
+export async function listProjects(
+  ctx: AuthContext,
+  options: { includeTasks?: boolean; includeActivities?: boolean } = {}
+) {
   requirePerm(ctx, 'project:read');
   const docs = await cols().projects.find({}).sort({ createdAt: 1 }).toArray();
-  return Promise.all(docs.map((d) => hydrateProject(d)));
+  const includeTasks = options.includeTasks !== false;
+  const hydrated = await Promise.all(
+    docs.map((d) =>
+      hydrateProject(d, {
+        includeTasks,
+        includeActivities: options.includeActivities,
+      })
+    )
+  );
+
+  if (includeTasks) return hydrated;
+
+  const counts =
+    docs.length === 0
+      ? []
+      : await cols()
+          .tasks.aggregate<{ _id: string; count: number }>([
+            { $match: { projectId: { $in: docs.map((d) => d._id) } } },
+            { $group: { _id: '$projectId', count: { $sum: 1 } } },
+          ])
+          .toArray();
+  const countByProject = new Map(counts.map((c) => [c._id, c.count]));
+  return hydrated.map((p) => ({
+    ...p,
+    badgeCount: countByProject.get(p.id) ?? 0,
+  }));
 }
 
 export async function getProject(ctx: AuthContext, projectId: string) {
@@ -58,6 +86,7 @@ export async function createProject(ctx: AuthContext, raw: CreateProjectInput) {
     color: input.color,
     columns: defaultColumns(),
     availableTags: [],
+    milestones: [],
     members: [{ userId: ctx.userId }],
     createdAt: now,
     updatedAt: now,
@@ -209,12 +238,19 @@ export async function deleteColumn(ctx: AuthContext, projectId: string, columnId
 export async function moveColumn(
   ctx: AuthContext,
   projectId: string,
-  sourceIndex: number,
+  source: string | number,
   destIndex: number
 ) {
   requirePerm(ctx, 'column:update', projectId);
   const project = await getProjectDoc(projectId);
   const colsSorted = [...project.columns].sort((a, b) => a.order - b.order);
+  let sourceIndex: number;
+  if (typeof source === 'string') {
+    sourceIndex = colsSorted.findIndex((c) => c.id === source);
+    if (sourceIndex === -1) throw notFound('Column not found');
+  } else {
+    sourceIndex = source;
+  }
   if (sourceIndex < 0 || sourceIndex >= colsSorted.length) throw badRequest('Invalid source index');
   if (destIndex < 0 || destIndex >= colsSorted.length) throw badRequest('Invalid dest index');
   const [moved] = colsSorted.splice(sourceIndex, 1);

@@ -36,7 +36,7 @@ export function slimProject(p: Project) {
     description: p.description,
     color: p.color,
     columnCount: p.columns.length,
-    taskCount: p.tasks.length,
+    taskCount: p.tasks.length || p.badgeCount || 0,
     memberCount: p.members.length,
     columns: p.columns.map((c) => ({
       id: c.id,
@@ -68,6 +68,10 @@ export function slimTask(t: SlimTaskInput) {
     assigneeIds: t.assignees.map((a) => a.id),
     assigneeNames: t.assignees.map((a) => a.name),
     tagNames: t.tags.map((tag) => tag.name),
+    milestoneId: t.milestoneId,
+    milestoneName: t.milestone?.name,
+    blockedBy: t.blockedBy ?? [],
+    blockerTitles: (t.blockers ?? []).map((b) => b.title),
     subtaskProgress: `${t.subtasks.filter((s) => s.completed).length}/${t.subtasks.length}`,
     commentsCount: t.commentsCount ?? t.activities.filter((a) => a.type === 'comment').length,
     projectId: t.projectId,
@@ -142,7 +146,14 @@ export function formatTaskDetailMarkdown(t: Task): string {
     `- **priority:** ${t.priority}`,
     `- **assignees:** ${t.assignees.map((a) => a.name).join(', ') || 'none'}`,
     `- **tags:** ${t.tags.map((tag) => tag.name).join(', ') || 'none'}`,
-    `- **due:** ${t.dueDate ?? 'none'}`,
+    `- **milestone:** ${t.milestone?.name ?? t.milestoneId ?? 'none'}`,
+    `- **blocked by:** ${
+      t.blockers?.length
+        ? t.blockers.map((b) => `${b.title}${b.done ? ' (done)' : ''}`).join(', ')
+        : 'none'
+    }`,
+    `- **start:** ${t.startDate ?? 'none'}`,
+    `- **due/end:** ${t.dueDate ?? 'none'}`,
     '',
     '## Description',
     t.description || '_(empty)_',
@@ -153,6 +164,9 @@ export function formatTaskDetailMarkdown(t: Task): string {
     `## Recent activity (${Math.min(t.activities.length, 5)})`,
     ...t.activities
       .slice(0, 5)
-      .map((a) => `- ${a.type}: ${a.content} — ${a.author.name}`),
+      .map((a) => {
+        const edited = a.editedAt ? ' _(edited)_' : '';
+        return `- ${a.type}: ${a.content}${edited} — ${a.author.name} (\`${a.id}\`)`;
+      }),
   ].join('\n');
 }

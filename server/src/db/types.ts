@@ -1,5 +1,5 @@
 import type { Collection, Db, MongoClient } from 'mongodb';
-import type { Role, Permission, Column, Tag, Subtask, TaskAttachment } from '../shared/schemas.js';
+import type { Role, Permission, Column, Tag, Subtask, TaskAttachment, Milestone } from '../shared/schemas.js';
 
 export interface UserDoc {
   _id: string;
@@ -32,6 +32,7 @@ export interface ProjectDoc {
   category?: 'favorites' | 'all' | 'archive';
   columns: Column[];
   availableTags: Tag[];
+  milestones?: Milestone[];
   members: ProjectMemberDoc[];
   createdAt: string;
   updatedAt: string;
@@ -53,6 +54,8 @@ export interface TaskDoc {
   subtasks: Subtask[];
   attachments?: TaskAttachment[];
   order: number;
+  milestoneId?: string;
+  blockedBy?: string[];
   createdAt: string;
   updatedAt: string;
 }
@@ -65,6 +68,8 @@ export interface ActivityDoc {
   content: string;
   authorId: string;
   createdAt: string;
+  /** Present when a comment was edited after creation. */
+  editedAt?: string;
 }
 
 export interface SessionDoc {

@@ -9,12 +9,34 @@ import { KeyRound, Trash2, Copy, Check } from 'lucide-react';
 
 const DEFAULT_SCOPES: Permission[] = [
   'project:read',
+  'column:create',
+  'column:update',
+  'column:delete',
   'task:read',
   'task:create',
   'task:update',
   'task:move',
   'task:delete',
   'comment:create',
+  'tag:manage',
+];
+
+/** Broader set an MCP agent typically needs to plan and bootstrap a project. */
+const MCP_AGENT_SCOPES: Permission[] = [
+  'project:read',
+  'project:create',
+  'project:update',
+  'column:create',
+  'column:update',
+  'column:delete',
+  'task:read',
+  'task:create',
+  'task:update',
+  'task:move',
+  'task:delete',
+  'comment:create',
+  'tag:manage',
+  'milestone:manage',
 ];
 
 type TokenRow = {
@@ -173,9 +195,20 @@ export const TokenManagerModal: React.FC<{ isOpen: boolean; onClose: () => void 
             className="w-full text-sm px-3 py-2 rounded-xl border border-border bg-canvas text-ink"
           />
           <div>
-            <p className="text-[10px] text-ink-muted mb-1.5 uppercase tracking-wide">
-              Scopes (limited to your role)
-            </p>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <p className="text-[10px] text-ink-muted uppercase tracking-wide">
+                Scopes (limited to your role)
+              </p>
+              <button
+                type="button"
+                onClick={() =>
+                  setScopes(MCP_AGENT_SCOPES.filter((s) => allowedScopes.includes(s)))
+                }
+                className="text-[10px] font-medium text-accent-blue hover:underline"
+              >
+                MCP agent preset
+              </button>
+            </div>
             <div className="flex flex-wrap gap-1.5 max-h-32 overflow-y-auto">
               {ALL_PERMISSIONS.filter((s) => allowedScopes.includes(s)).map((s) => (
                 <button
@@ -244,6 +277,9 @@ export const TokenManagerModal: React.FC<{ isOpen: boolean; onClose: () => void 
                   {t.scopes.length} scopes · {projectLabel(t.projectIds)} · created{' '}
                   {new Date(t.createdAt).toLocaleDateString()}
                   {t.lastUsedAt ? ` · last used ${new Date(t.lastUsedAt).toLocaleString()}` : ''}
+                </p>
+                <p className="text-[10px] font-mono text-ink-muted mt-1 break-words">
+                  {t.scopes.join(', ')}
                 </p>
               </div>
               <button

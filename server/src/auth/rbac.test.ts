@@ -101,5 +101,8 @@ describe('validateEditableRolePerms', () => {
     expect(DEFAULT_ROLE_PERMISSIONS.member).not.toContain('tag:manage');
     expect(DEFAULT_ROLE_PERMISSIONS.viewer).not.toContain('tag:manage');
     expect(permissionsForRole('owner')).toContain('tag:manage');
+    expect(DEFAULT_ROLE_PERMISSIONS.admin).toContain('milestone:manage');
+    expect(DEFAULT_ROLE_PERMISSIONS.member).not.toContain('milestone:manage');
+    expect(permissionsForRole('owner')).toContain('milestone:manage');
   });
 });

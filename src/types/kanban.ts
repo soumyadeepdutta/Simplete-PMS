@@ -32,6 +32,20 @@ export interface Tag {
   textColor?: string;
 }
 
+export interface Milestone {
+  id: string;
+  name: string;
+  description?: string;
+  dueDate?: string;
+  order: number;
+}
+
+export interface TaskBlocker {
+  id: string;
+  title: string;
+  done: boolean;
+}
+
 export interface Subtask {
   id: string;
   title: string;
@@ -44,6 +58,8 @@ export interface TaskActivity {
   content: string;
   author: User;
   createdAt: string;
+  /** Present when a comment was edited after creation. */
+  editedAt?: string;
 }
 
 export interface TaskAttachment {
@@ -71,6 +87,10 @@ export interface Task {
   commentsCount?: number;
   attachmentsCount?: number;
   order: number;
+  milestoneId?: string;
+  milestone?: Milestone;
+  blockedBy?: string[];
+  blockers?: TaskBlocker[];
   createdAt: string;
   updatedAt: string;
 }
@@ -112,6 +132,7 @@ export interface Project {
   tasks: Task[];
   members: User[];
   availableTags: Tag[];
+  milestones?: Milestone[];
   createdAt: string;
   updatedAt: string;
 }
@@ -134,6 +155,8 @@ export interface FilterState {
   assigneeIds: string[];
   tagIds: string[];
   columnIds: string[];
+  milestoneIds?: string[];
+  blockedOnly?: boolean;
   dueFilter: 'all' | 'overdue' | 'due-today' | 'upcoming' | 'no-date';
   sortBy: 'order' | 'dueDate' | 'priority' | 'title';
   sortOrder: 'asc' | 'desc';
@@ -157,6 +180,7 @@ export type Permission =
   | 'member:update'
   | 'member:remove'
   | 'tag:manage'
+  | 'milestone:manage'
   | 'token:manage'
   | 'settings:manage'
   | 'audit:read';

@@ -1,7 +1,8 @@
 import { cols } from '../db/client.js';
 import type { ActivityDoc, ProjectDoc, TaskDoc, UserDoc } from '../db/types.js';
-import type { Project, PublicUser, Task, TaskActivity, Tag } from '../shared/schemas.js';
+import type { Milestone, Project, PublicUser, Task, TaskActivity, Tag, TaskBlocker } from '../shared/schemas.js';
 import { toPublicUser } from '../auth/context.js';
+import { isDoneColumnTitle } from './taskStatus.js';
 
 export async function loadUsersByIds(ids: string[]): Promise<Map<string, UserDoc>> {
   const unique = [...new Set(ids)];
@@ -15,6 +16,37 @@ export async function loadUsersByIds(ids: string[]): Promise<Map<string, UserDoc
 export function tagsForIds(project: ProjectDoc, tagIds: string[]): Tag[] {
   const map = new Map(project.availableTags.map((t) => [t.id, t]));
   return tagIds.map((id) => map.get(id)).filter((t): t is Tag => Boolean(t));
+}
+
+export function milestoneForId(project: ProjectDoc, milestoneId?: string): Milestone | undefined {
+  if (!milestoneId) return undefined;
+  return (project.milestones ?? []).find((m) => m.id === milestoneId);
+}
+
+export function blockersFromDocs(
+  project: ProjectDoc,
+  blockedBy: string[] | undefined,
+  taskById: Map<string, TaskDoc>
+): TaskBlocker[] {
+  if (!blockedBy?.length) return [];
+  return blockedBy.map((id) => {
+    const doc = taskById.get(id);
+    const col = doc ? project.columns.find((c) => c.id === doc.columnId) : undefined;
+    return {
+      id,
+      title: doc?.title ?? id,
+      done: col ? isDoneColumnTitle(col.title) : false,
+    };
+  });
+}
+
+export async function loadTaskDocsByIds(ids: string[]): Promise<Map<string, TaskDoc>> {
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const docs = await cols()
+    .tasks.find({ _id: { $in: unique } })
+    .toArray();
+  return new Map(docs.map((d) => [d._id, d]));
 }
 
 export async function hydrateActivities(
@@ -39,6 +71,7 @@ export async function hydrateActivities(
       content: a.content,
       author,
       createdAt: a.createdAt,
+      ...(a.editedAt ? { editedAt: a.editedAt } : {}),
     };
   });
 }
@@ -47,7 +80,8 @@ export async function hydrateTask(
   task: TaskDoc,
   project: ProjectDoc,
   userMap?: Map<string, UserDoc>,
-  activities?: ActivityDoc[]
+  activities?: ActivityDoc[],
+  blockerDocs?: Map<string, TaskDoc>
 ): Promise<Task> {
   const map = userMap ?? (await loadUsersByIds(task.assigneeIds));
   const assignees = task.assigneeIds
@@ -61,6 +95,10 @@ export async function hydrateTask(
     const actUsers = await loadUsersByIds([...authorIds, ...task.assigneeIds]);
     acts = await hydrateActivities(activities, actUsers);
   }
+
+  const blockerMap = blockerDocs ?? (await loadTaskDocsByIds(task.blockedBy ?? []));
+  const milestone = milestoneForId(project, task.milestoneId);
+  const blockers = blockersFromDocs(project, task.blockedBy, blockerMap);
 
   return {
     id: task._id,
@@ -80,6 +118,9 @@ export async function hydrateTask(
     commentsCount: acts.filter((a) => a.type === 'comment').length,
     attachmentsCount: task.attachments?.length ?? 0,
     order: task.order,
+    ...(task.milestoneId ? { milestoneId: task.milestoneId } : {}),
+    ...(milestone ? { milestone } : {}),
+    ...(task.blockedBy?.length ? { blockedBy: task.blockedBy, blockers } : {}),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   };
@@ -108,6 +149,7 @@ export async function hydrateProject(
 
     const allAssigneeIds = taskDocs.flatMap((t) => t.assigneeIds);
     const userMap = await loadUsersByIds([...memberIds, ...allAssigneeIds]);
+    const taskById = new Map(taskDocs.map((t) => [t._id, t]));
 
     let activitiesByTask = new Map<string, ActivityDoc[]>();
     if (includeActivities && taskDocs.length > 0) {
@@ -125,7 +167,13 @@ export async function hydrateProject(
 
     tasks = await Promise.all(
       taskDocs.map((t) =>
-        hydrateTask(t, project, userMap, includeActivities ? activitiesByTask.get(t._id) ?? [] : [])
+        hydrateTask(
+          t,
+          project,
+          userMap,
+          includeActivities ? activitiesByTask.get(t._id) ?? [] : [],
+          taskById
+        )
       )
     );
   }
@@ -142,6 +190,7 @@ export async function hydrateProject(
     tasks,
     members,
     availableTags: project.availableTags,
+    milestones: [...(project.milestones ?? [])].sort((a, b) => a.order - b.order),
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };

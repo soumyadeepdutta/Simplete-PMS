@@ -1,4 +1,4 @@
-import type { Column, MyTask, Permission, Priority, Project, Tag, Task, User } from '../types/kanban';
+import type { Column, Milestone, MyTask, Permission, Priority, Project, Tag, Task, User } from '../types/kanban';
 
 export class ApiError extends Error {
   constructor(
@@ -167,6 +167,41 @@ export const api = {
       method: 'DELETE',
     }),
 
+  listMilestones: (projectId: string) =>
+    request<(Milestone & { taskCount: number; completedCount: number })[]>(
+      `/api/projects/${projectId}/milestones`
+    ),
+
+  createMilestone: (
+    projectId: string,
+    body: { name: string; description?: string; dueDate?: string }
+  ) =>
+    request<Milestone>(`/api/projects/${projectId}/milestones`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
+  updateMilestone: (
+    projectId: string,
+    milestoneId: string,
+    body: { name?: string; description?: string | null; dueDate?: string | null }
+  ) =>
+    request<Milestone>(`/api/projects/${projectId}/milestones/${milestoneId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    }),
+
+  deleteMilestone: (projectId: string, milestoneId: string) =>
+    request<{ ok: boolean }>(`/api/projects/${projectId}/milestones/${milestoneId}`, {
+      method: 'DELETE',
+    }),
+
+  setTaskDependencies: (projectId: string, taskId: string, blockedBy: string[]) =>
+    request<Task>(`/api/projects/${projectId}/tasks/${taskId}/dependencies`, {
+      method: 'PUT',
+      body: JSON.stringify({ blockedBy }),
+    }),
+
   createColumn: (
     projectId: string,
     body: { title: string; color: string; wipLimit?: number }
@@ -253,6 +288,34 @@ export const api = {
     request<Task>(`/api/projects/${projectId}/tasks/${taskId}/comments`, {
       method: 'POST',
       body: JSON.stringify({ content }),
+    }),
+
+  updateComment: (
+    projectId: string,
+    taskId: string,
+    activityId: string,
+    content: string
+  ) =>
+    request<Task>(
+      `/api/projects/${projectId}/tasks/${taskId}/comments/${activityId}`,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({ content }),
+      }
+    ),
+
+  createTasks: (
+    projectId: string,
+    tasks: unknown[]
+  ) =>
+    request<{
+      created: Task[];
+      failed: { index: number; title?: string; error: string }[];
+      createdCount: number;
+      failedCount: number;
+    }>(`/api/projects/${projectId}/tasks/bulk`, {
+      method: 'POST',
+      body: JSON.stringify({ tasks }),
     }),
 
   addSubtask: (projectId: string, taskId: string, title: string) =>

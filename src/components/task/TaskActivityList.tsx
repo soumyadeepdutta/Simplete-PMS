@@ -72,7 +72,12 @@ export const TaskActivityList: React.FC<TaskActivityListProps> = ({
               <Avatar user={act.author} size="xs" className="mt-0.5" />
               <div className="flex-1 bg-canvas p-3 rounded-xl border border-border">
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <span className="font-semibold text-ink">{act.author.name}</span>
+                  <span className="font-semibold text-ink">
+                    {act.author.name}
+                    {act.type === 'comment' && act.editedAt ? (
+                      <span className="ml-1.5 font-normal text-[10px] text-ink-subtle">(edited)</span>
+                    ) : null}
+                  </span>
                   <span className="text-[10px] text-ink-subtle font-mono flex items-center gap-1">
                     <Clock className="w-3 h-3" />
                     {formatFullDateTime(act.createdAt)}

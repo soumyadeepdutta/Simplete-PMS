@@ -20,6 +20,12 @@ function assertUniqueName(tags: Tag[], name: string, excludeId?: string): void {
   }
 }
 
+export async function listTags(ctx: AuthContext, projectId: string) {
+  requirePerm(ctx, 'project:read', projectId);
+  const project = await getProjectDoc(projectId);
+  return project.availableTags;
+}
+
 export async function createTag(ctx: AuthContext, projectId: string, raw: CreateTagInput) {
   requirePerm(ctx, 'tag:manage', projectId);
   const input = CreateTagInputSchema.parse(raw);

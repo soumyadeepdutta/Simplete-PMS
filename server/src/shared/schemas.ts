@@ -24,6 +24,7 @@ export const PermissionSchema = z.enum([
   'member:update',
   'member:remove',
   'tag:manage',
+  'milestone:manage',
   'token:manage',
   'settings:manage',
   'audit:read',
@@ -55,6 +56,22 @@ export const TagSchema = z.object({
 });
 export type Tag = z.infer<typeof TagSchema>;
 
+export const MilestoneSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  dueDate: z.string().optional(),
+  order: z.number(),
+});
+export type Milestone = z.infer<typeof MilestoneSchema>;
+
+export const TaskBlockerSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  done: z.boolean(),
+});
+export type TaskBlocker = z.infer<typeof TaskBlockerSchema>;
+
 export const SubtaskSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -68,6 +85,8 @@ export const TaskActivitySchema = z.object({
   content: z.string(),
   author: PublicUserSchema,
   createdAt: z.string(),
+  /** Set when a comment activity has been edited. */
+  editedAt: z.string().optional(),
 });
 export type TaskActivity = z.infer<typeof TaskActivitySchema>;
 
@@ -106,6 +125,10 @@ export const TaskSchema = z.object({
   commentsCount: z.number().optional(),
   attachmentsCount: z.number().optional(),
   order: z.number(),
+  milestoneId: z.string().optional(),
+  milestone: MilestoneSchema.optional(),
+  blockedBy: z.array(z.string()).optional(),
+  blockers: z.array(TaskBlockerSchema).optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -144,6 +167,7 @@ export const ProjectSchema = z.object({
   tasks: z.array(TaskSchema),
   members: z.array(PublicUserSchema),
   availableTags: z.array(TagSchema),
+  milestones: z.array(MilestoneSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });
@@ -155,40 +179,99 @@ export const FilterStateSchema = z.object({
   assigneeIds: z.array(z.string()).default([]),
   tagIds: z.array(z.string()).default([]),
   columnIds: z.array(z.string()).default([]),
+  milestoneIds: z.array(z.string()).default([]),
+  blockedOnly: z.preprocess((v) => {
+    if (v === 'true' || v === true) return true;
+    if (v === 'false' || v === false || v === '' || v === undefined) return false;
+    return v;
+  }, z.boolean()).default(false),
   dueFilter: z.enum(['all', 'overdue', 'due-today', 'upcoming', 'no-date']).default('all'),
   sortBy: z.enum(['order', 'dueDate', 'priority', 'title']).default('order'),
   sortOrder: z.enum(['asc', 'desc']).default('asc'),
 });
 export type FilterState = z.infer<typeof FilterStateSchema>;
 
-export const CreateTaskInputSchema = z.object({
-  title: z.string().min(1),
-  description: z.string().default(''),
-  columnId: z.string().min(1),
-  priority: PrioritySchema.default('medium'),
-  assigneeIds: z.array(z.string()).default([]),
-  tagIds: z.array(z.string()).default([]),
-  startDate: z.string().optional(),
-  dueDate: z.string().optional(),
-  estimatedHours: z.number().optional(),
-  subtasks: z.array(z.object({ title: z.string().min(1) })).optional(),
-});
+export const CreateTaskInputSchema = z
+  .object({
+    title: z.string().min(1),
+    description: z.string().default(''),
+    columnId: z.string().min(1),
+    priority: PrioritySchema.default('medium'),
+    assigneeIds: z.array(z.string()).default([]),
+    /** Assignee names or emails to resolve into assigneeIds (case-insensitive). */
+    assignees: z.array(z.string().min(1)).optional(),
+    tagIds: z.array(z.string()).default([]),
+    /** Tag names (case-insensitive). Resolved against the catalog; unknown names are created when the caller has tag:manage. */
+    tags: z.array(z.string().min(1)).optional(),
+    startDate: z.string().optional(),
+    dueDate: z.string().optional(),
+    /** Alias for `dueDate` (task end / due). Ignored when `dueDate` is also set. */
+    endDate: z.string().optional(),
+    estimatedHours: z.number().optional(),
+    subtasks: z.array(z.object({ title: z.string().min(1) })).optional(),
+    milestoneId: z.string().optional(),
+    blockedBy: z.array(z.string()).optional(),
+  })
+  .transform(({ endDate, dueDate, ...rest }) => ({
+    ...rest,
+    dueDate: dueDate ?? endDate,
+  }));
 export type CreateTaskInput = z.infer<typeof CreateTaskInputSchema>;
 
-export const UpdateTaskInputSchema = z.object({
-  title: z.string().min(1).optional(),
-  description: z.string().optional(),
-  priority: PrioritySchema.optional(),
-  assigneeIds: z.array(z.string()).optional(),
-  tagIds: z.array(z.string()).optional(),
-  startDate: z.string().nullable().optional(),
-  dueDate: z.string().nullable().optional(),
-  estimatedHours: z.number().nullable().optional(),
-  spentHours: z.number().optional(),
-  subtasks: z.array(SubtaskSchema).optional(),
-  attachments: z.array(TaskAttachmentSchema).optional(),
+export const BulkCreateTasksInputSchema = z.object({
+  tasks: z.array(CreateTaskInputSchema).min(1).max(50),
 });
+export type BulkCreateTasksInput = z.infer<typeof BulkCreateTasksInputSchema>;
+
+export const UpdateTaskInputSchema = z
+  .object({
+    title: z.string().min(1).optional(),
+    description: z.string().optional(),
+    priority: PrioritySchema.optional(),
+    assigneeIds: z.array(z.string()).optional(),
+    /** Assignee names or emails to resolve into assigneeIds (case-insensitive). */
+    assignees: z.array(z.string().min(1)).optional(),
+    tagIds: z.array(z.string()).optional(),
+    tags: z.array(z.string().min(1)).optional(),
+    startDate: z.string().nullable().optional(),
+    dueDate: z.string().nullable().optional(),
+    /** Alias for `dueDate`. Ignored when `dueDate` is also set. Pass `null` to clear. */
+    endDate: z.string().nullable().optional(),
+    estimatedHours: z.number().nullable().optional(),
+    spentHours: z.number().optional(),
+    subtasks: z.array(SubtaskSchema).optional(),
+    attachments: z.array(TaskAttachmentSchema).optional(),
+    milestoneId: z.string().nullable().optional(),
+    blockedBy: z.array(z.string()).optional(),
+  })
+  .transform(({ endDate, dueDate, ...rest }) => {
+    const out: {
+      title?: string;
+      description?: string;
+      priority?: z.infer<typeof PrioritySchema>;
+      assigneeIds?: string[];
+      assignees?: string[];
+      tagIds?: string[];
+      tags?: string[];
+      startDate?: string | null;
+      dueDate?: string | null;
+      estimatedHours?: number | null;
+      spentHours?: number;
+      subtasks?: z.infer<typeof SubtaskSchema>[];
+      attachments?: z.infer<typeof TaskAttachmentSchema>[];
+      milestoneId?: string | null;
+      blockedBy?: string[];
+    } = { ...rest };
+    if (dueDate !== undefined) out.dueDate = dueDate;
+    else if (endDate !== undefined) out.dueDate = endDate;
+    return out;
+  });
 export type UpdateTaskInput = z.infer<typeof UpdateTaskInputSchema>;
+
+export const UpdateCommentInputSchema = z.object({
+  content: z.string().min(1),
+});
+export type UpdateCommentInput = z.infer<typeof UpdateCommentInputSchema>;
 
 export const MoveTaskInputSchema = z.object({
   columnId: z.string().min(1),
@@ -240,6 +323,22 @@ export const UpdateTagInputSchema = z.object({
   textColor: z.string().nullable().optional(),
 });
 
+export const CreateMilestoneInputSchema = z.object({
+  name: z.string().min(1).max(120),
+  description: z.string().optional(),
+  dueDate: z.string().optional(),
+});
+
+export const UpdateMilestoneInputSchema = z.object({
+  name: z.string().min(1).max(120).optional(),
+  description: z.string().nullable().optional(),
+  dueDate: z.string().nullable().optional(),
+});
+
+export const SetTaskDependenciesInputSchema = z.object({
+  blockedBy: z.array(z.string()),
+});
+
 export const LoginInputSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -278,5 +377,8 @@ export type CreateProjectInput = z.infer<typeof CreateProjectInputSchema>;
 export type UpdateProjectInput = z.infer<typeof UpdateProjectInputSchema>;
 export type CreateTagInput = z.infer<typeof CreateTagInputSchema>;
 export type UpdateTagInput = z.infer<typeof UpdateTagInputSchema>;
+export type CreateMilestoneInput = z.infer<typeof CreateMilestoneInputSchema>;
+export type UpdateMilestoneInput = z.infer<typeof UpdateMilestoneInputSchema>;
+export type SetTaskDependenciesInput = z.infer<typeof SetTaskDependenciesInputSchema>;
 export type InviteMemberInput = z.infer<typeof InviteMemberInputSchema>;
 export type UpdateMemberInput = z.infer<typeof UpdateMemberInputSchema>;

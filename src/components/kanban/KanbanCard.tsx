@@ -5,7 +5,7 @@ import { PriorityBadge, TagBadge } from '../ui/Badge';
 import { AvatarGroup } from '../ui/Avatar';
 import { TaskMoveMenu } from '../task/TaskMoveMenu';
 import { useKanban } from '../../context/KanbanContext';
-import { Calendar, CheckSquare, MessageSquare, Paperclip } from 'lucide-react';
+import { Calendar, CheckSquare, Flag, MessageSquare, Paperclip } from 'lucide-react';
 import { formatDisplayDate, getDueStatus } from '../../utils/dateUtils';
 import { cn } from '../../utils/cn';
 
@@ -42,6 +42,17 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ task, index, isDragDisab
         >
           <div className="flex items-center justify-between gap-2 mb-2.5">
             <div className="flex items-center gap-1.5 flex-wrap">
+              {task.milestone && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-surface-muted text-ink-muted border border-border">
+                  <Flag className="w-2.5 h-2.5" />
+                  {task.milestone.name}
+                </span>
+              )}
+              {task.blockers && task.blockers.some((b) => !b.done) && (
+                <span className="inline-flex items-center text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-accent-orange-soft text-accent-orange border border-accent-orange/20">
+                  Blocked by {task.blockers.filter((b) => !b.done).length}
+                </span>
+              )}
               {task.tags.slice(0, 2).map((tag) => (
                 <TagBadge key={tag.id} tag={tag} />
               ))}

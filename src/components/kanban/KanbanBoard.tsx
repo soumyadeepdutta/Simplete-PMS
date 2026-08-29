@@ -61,7 +61,7 @@ export const KanbanBoard: React.FC = () => {
             <div
               ref={boardProvided.innerRef}
               {...boardProvided.droppableProps}
-              className="flex-1 overflow-x-auto overflow-y-hidden p-4 sm:p-5 flex items-start gap-5"
+              className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden p-4 sm:p-5 flex items-stretch gap-5"
             >
               {sortedColumns.map((col, idx) => {
                 const columnTasks = filteredTasks
@@ -79,7 +79,11 @@ export const KanbanBoard: React.FC = () => {
                       <div
                         ref={colProvided.innerRef}
                         {...colProvided.draggableProps}
-                        className={colSnapshot.isDragging ? 'opacity-90' : undefined}
+                        className={
+                          colSnapshot.isDragging
+                            ? 'h-full opacity-90'
+                            : 'h-full'
+                        }
                       >
                         <KanbanColumn
                           column={col}
@@ -95,7 +99,7 @@ export const KanbanBoard: React.FC = () => {
               {boardProvided.placeholder}
 
               {can('column:create') && (
-                <div className="shrink-0 w-[300px] sm:w-80 pt-8">
+                <div className="shrink-0 w-[300px] sm:w-80 self-start pt-8">
                   <button
                     type="button"
                     onClick={() => setIsAddColumnOpen(true)}

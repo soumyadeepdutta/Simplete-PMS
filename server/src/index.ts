@@ -19,6 +19,8 @@ export async function buildApp() {
       level: env.NODE_ENV === 'production' ? 'info' : 'debug',
     },
     trustProxy: true,
+    requestTimeout: 30_000,
+    connectionTimeout: 10_000,
   });
 
   await app.register(cors, {

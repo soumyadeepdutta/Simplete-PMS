@@ -7,7 +7,7 @@ import { Priority, Tag, User } from '../../types/kanban';
 import { Avatar } from '../ui/Avatar';
 import { SubtaskList } from './SubtaskList';
 import { TaskActivityList } from './TaskActivityList';
-import { Calendar, Clock, UserCheck, Tag as TagIcon, Trash2, CheckCircle2 } from 'lucide-react';
+import { Calendar, Clock, UserCheck, Tag as TagIcon, Trash2, CheckCircle2, Flag, Ban } from 'lucide-react';
 import { getDueStatus, formatDisplayDate } from '../../utils/dateUtils';
 
 export const TaskDetailModal: React.FC = () => {
@@ -311,6 +311,43 @@ export const TaskDetailModal: React.FC = () => {
  })}
  </div>
  </div>
+
+ {/* Milestone (read-only) */}
+ {task.milestone && (
+ <div className="space-y-2">
+ <span className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
+ <Flag className="w-4 h-4 text-accent-blue" /> Milestone
+ </span>
+ <p className="text-xs text-ink px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border">
+ {task.milestone.name}
+ {task.milestone.dueDate ? ` · due ${formatDisplayDate(task.milestone.dueDate)}` : ''}
+ </p>
+ </div>
+ )}
+
+ {/* Blockers (read-only) */}
+ {task.blockers && task.blockers.length > 0 && (
+ <div className="space-y-2">
+ <span className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
+ <Ban className="w-4 h-4 text-accent-orange" /> Blocked by
+ </span>
+ <ul className="space-y-1">
+ {task.blockers.map((b) => (
+ <li
+ key={b.id}
+ className={`text-xs px-2.5 py-1.5 rounded-lg border ${
+ b.done
+ ? 'bg-canvas text-ink-muted border-border'
+ : 'bg-accent-orange-soft text-accent-orange border-accent-orange/20'
+ }`}
+ >
+ {b.title}
+ {b.done ? ' · done' : ''}
+ </li>
+ ))}
+ </ul>
+ </div>
+ )}
 
  {/* Tags */}
  <div className="space-y-2">
