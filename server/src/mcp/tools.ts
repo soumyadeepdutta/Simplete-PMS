@@ -55,6 +55,9 @@ function toolError(err: unknown) {
   } else if (/Invalid columnId/i.test(message)) {
     message +=
       '. Hint: use simplete_get_project to list column ids for the project.';
+  } else if (/deliverable/i.test(message)) {
+    message +=
+      '. Hint: complete all deliverables (subtasks) via simplete_toggle_subtask before moving into a Done column.';
   }
 
   return {

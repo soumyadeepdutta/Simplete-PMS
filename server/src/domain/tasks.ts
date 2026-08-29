@@ -6,6 +6,7 @@ import { writeAudit } from './audit.js';
 import { getProjectDoc } from './projects.js';
 import { hydrateTask, loadUsersByIds } from './hydrate.js';
 import { needsReindex, orderBetween, reindexOrders } from './ordering.js';
+import { assertDeliverablesAllowDone, isDoneColumnTitle } from './taskStatus.js';
 import { newId } from '../shared/id.js';
 import { badRequest, notFound } from '../shared/errors.js';
 import {
@@ -244,7 +245,8 @@ export async function createTask(ctx: AuthContext, projectId: string, raw: Creat
   requirePerm(ctx, 'task:create', projectId);
   const input = CreateTaskInputSchema.parse(raw);
   const project = await getProjectDoc(projectId);
-  if (!project.columns.some((c) => c.id === input.columnId)) {
+  const destColumn = project.columns.find((c) => c.id === input.columnId);
+  if (!destColumn) {
     throw badRequest('Invalid columnId');
   }
   assertValidTagIds(project.availableTags, input.tagIds);
@@ -261,6 +263,10 @@ export async function createTask(ctx: AuthContext, projectId: string, raw: Creat
     title: s.title,
     completed: false,
   }));
+
+  if (isDoneColumnTitle(destColumn.title)) {
+    assertDeliverablesAllowDone(subtasks);
+  }
 
   const doc: TaskDoc = {
     _id: newId('task'),
@@ -353,12 +359,17 @@ export async function moveTask(
   requirePerm(ctx, 'task:move', projectId);
   const input = MoveTaskInputSchema.parse(raw);
   const project = await getProjectDoc(projectId);
-  if (!project.columns.some((c) => c.id === input.columnId)) {
+  const destColumn = project.columns.find((c) => c.id === input.columnId);
+  if (!destColumn) {
     throw badRequest('Invalid columnId');
   }
 
   const task = await cols().tasks.findOne({ _id: taskId, projectId });
   if (!task) throw notFound('Task not found');
+
+  if (isDoneColumnTitle(destColumn.title) && task.columnId !== input.columnId) {
+    assertDeliverablesAllowDone(task.subtasks);
+  }
 
   const destTasks = await cols()
     .tasks.find({ projectId, columnId: input.columnId, _id: { $ne: taskId } })

@@ -87,9 +87,11 @@ export const MembersModal: React.FC<{ isOpen: boolean; onClose: () => void }> = 
     setError(null);
     try {
       await api.removeMember(userId);
+      setMembers((prev) => prev.filter((m) => m.id !== userId));
       await reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Remove failed');
+      await reload();
     }
   };
 

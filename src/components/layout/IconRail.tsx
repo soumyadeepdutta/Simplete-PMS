@@ -17,7 +17,6 @@ import { useKanban } from '../../context/KanbanContext';
 import { cn } from '../../utils/cn';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { MembersModal } from '../auth/MembersModal';
-import { AuditModal } from '../auth/AuditModal';
 
 const railBtn =
   'p-2.5 rounded-xl text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors';
@@ -39,7 +38,6 @@ export const IconRail: React.FC<IconRailProps> = ({
   const { workspaceMode, setWorkspaceMode } = useKanban();
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
 
   const cycleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -49,6 +47,7 @@ export const IconRail: React.FC<IconRailProps> = ({
 
   const onProjects = workspaceMode === 'project';
   const onMyTasks = workspaceMode === 'my-tasks';
+  const onAudit = workspaceMode === 'audit';
 
   return (
     <>
@@ -72,10 +71,10 @@ export const IconRail: React.FC<IconRailProps> = ({
               )}
               <button
                 className={cn(onProjects && !sidebarCollapsed ? railBtnActive : railBtn, 'relative')}
-                title={sidebarCollapsed ? 'Show projects' : 'Hide projects'}
+                title={sidebarCollapsed ? 'Show projects' : 'Projects'}
                 type="button"
                 onClick={() => {
-                  if (workspaceMode === 'my-tasks') setWorkspaceMode('project');
+                  if (workspaceMode !== 'project') setWorkspaceMode('project');
                   onToggleSidebar?.();
                 }}
               >
@@ -111,14 +110,19 @@ export const IconRail: React.FC<IconRailProps> = ({
             )}
 
             {can('audit:read') && (
-              <button
-                className={railBtn}
-                title="Audit log"
-                type="button"
-                onClick={() => setAuditOpen(true)}
-              >
-                <ScrollText className="w-5 h-5" />
-              </button>
+              <div className="relative">
+                {onAudit && (
+                  <span className="absolute -left-3.5 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-accent-blue rounded-r-full" />
+                )}
+                <button
+                  className={cn(onAudit ? railBtnActive : railBtn, 'relative')}
+                  title="Audit log"
+                  type="button"
+                  onClick={() => setWorkspaceMode('audit')}
+                >
+                  <ScrollText className={cn('w-5 h-5', onAudit && 'fill-accent-blue')} />
+                </button>
+              </div>
             )}
 
             {sidebarCollapsed && (
@@ -174,9 +178,6 @@ export const IconRail: React.FC<IconRailProps> = ({
 
       <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
       <MembersModal isOpen={membersOpen} onClose={() => setMembersOpen(false)} />
-      {can('audit:read') && (
-        <AuditModal isOpen={auditOpen} onClose={() => setAuditOpen(false)} />
-      )}
     </>
   );
 };

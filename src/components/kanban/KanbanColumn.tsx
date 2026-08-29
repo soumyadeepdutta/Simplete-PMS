@@ -6,6 +6,13 @@ import { useKanban } from '../../context/KanbanContext';
 import { useAuth } from '../../context/AuthContext';
 import { Plus, MoreHorizontal, Trash2, Edit2, AlertCircle, GripVertical, Palette } from 'lucide-react';
 import { cn } from '../../utils/cn';
+import {
+  Dropdown,
+  DropdownContent,
+  DropdownItem,
+  DropdownSeparator,
+  DropdownTrigger,
+} from '../ui/Dropdown';
 
 const PRESET_COLORS = [
   '#818CF8',
@@ -32,7 +39,6 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
 }) => {
   const { openNewTaskModal, deleteColumn, updateColumn } = useKanban();
   const { can } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleInput, setTitleInput] = useState(column.title);
   const [wipInput, setWipInput] = useState(column.wipLimit?.toString() || '');
@@ -141,76 +147,41 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
             )}
 
             {(canUpdate || canDelete) && (
-              <>
-                <button
-                  type="button"
-                  onClick={() => setIsMenuOpen(!isMenuOpen)}
-                  className="p-1.5 rounded-lg text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors"
+              <Dropdown align="end">
+                <DropdownTrigger
+                  aria-label={`Column options for ${column.title}`}
+                  className="p-1.5 rounded-lg text-ink-subtle hover:text-ink hover:bg-surface-muted border-transparent shadow-none bg-transparent"
                 >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
-                </button>
-
-                {isMenuOpen && (
-                  <div className="absolute right-0 top-full mt-2 w-44 bg-glass-strong rounded-xl shadow-elevated border border-glass py-1.5 z-50">
-                    {canUpdate && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            setIsEditingTitle(true);
-                          }}
-                          className="w-full px-3 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2.5 transition-colors"
-                        >
-                          <Edit2 className="w-3.5 h-3.5" />
-                          Rename Column
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            setIsEditingWip(true);
-                          }}
-                          className="w-full px-3 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2.5 transition-colors"
-                        >
-                          <AlertCircle className="w-3.5 h-3.5" />
-                          Set WIP Limit
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            setIsRecolorOpen(true);
-                          }}
-                          className="w-full px-3 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2.5 transition-colors"
-                        >
-                          <Palette className="w-3.5 h-3.5" />
-                          Change color
-                        </button>
-                      </>
-                    )}
-
-                    {canDelete && (
-                      <>
-                        <div className="my-1 border-t border-border" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsMenuOpen(false);
-                            deleteColumn(column.id);
-                          }}
-                          className="w-full px-3 py-2 text-xs text-left text-accent-red hover:bg-accent-red-soft flex items-center gap-2.5 transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Delete Column
-                        </button>
-                      </>
-                    )}
-                  </div>
-                )}
-              </>
+                  <MoreHorizontal className="w-3.5 h-3.5" aria-hidden="true" />
+                </DropdownTrigger>
+                <DropdownContent widthClass="w-44">
+                  {canUpdate && (
+                    <>
+                      <DropdownItem onSelect={() => setIsEditingTitle(true)}>
+                        <Edit2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        Rename Column
+                      </DropdownItem>
+                      <DropdownItem onSelect={() => setIsEditingWip(true)}>
+                        <AlertCircle className="w-3.5 h-3.5" aria-hidden="true" />
+                        Set WIP Limit
+                      </DropdownItem>
+                      <DropdownItem onSelect={() => setIsRecolorOpen(true)}>
+                        <Palette className="w-3.5 h-3.5" aria-hidden="true" />
+                        Change color
+                      </DropdownItem>
+                    </>
+                  )}
+                  {canDelete && (
+                    <>
+                      <DropdownSeparator />
+                      <DropdownItem destructive onSelect={() => deleteColumn(column.id)}>
+                        <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                        Delete Column
+                      </DropdownItem>
+                    </>
+                  )}
+                </DropdownContent>
+              </Dropdown>
             )}
           </div>
         )}

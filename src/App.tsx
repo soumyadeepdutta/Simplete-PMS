@@ -13,6 +13,7 @@ import { MetricsView } from './components/views/MetricsView';
 import { TimelineView } from './components/views/TimelineView';
 import { OverviewView } from './components/views/OverviewView';
 import { MyTasksView } from './components/views/MyTasksView';
+import { AuditView } from './components/views/AuditView';
 import { TaskDetailModal } from './components/task/TaskDetailModal';
 import { NewTaskModal } from './components/task/NewTaskModal';
 import { Toast } from './components/ui/Toast';
@@ -69,6 +70,7 @@ const KanbanAppContent: React.FC = () => {
   }
 
   const isMyTasks = workspaceMode === 'my-tasks';
+  const isAudit = workspaceMode === 'audit';
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden bg-canvas text-ink">
@@ -87,6 +89,8 @@ const KanbanAppContent: React.FC = () => {
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden bg-canvas">
         {isMyTasks ? (
           <MyTasksView />
+        ) : isAudit ? (
+          <AuditView />
         ) : (
           <>
             <ProjectHeader

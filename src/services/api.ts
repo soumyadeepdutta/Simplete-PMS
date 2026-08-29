@@ -95,13 +95,15 @@ export const api = {
   removeMember: (userId: string) =>
     request<{ ok: boolean }>(`/api/members/${userId}`, { method: 'DELETE' }),
 
-  listAudit: (opts?: { limit?: number; projectId?: string }) => {
+  listAudit: (opts?: { page?: number; pageSize?: number; limit?: number; projectId?: string }) => {
     const params = new URLSearchParams();
-    if (opts?.limit != null) params.set('limit', String(opts.limit));
+    if (opts?.page != null) params.set('page', String(opts.page));
+    if (opts?.pageSize != null) params.set('pageSize', String(opts.pageSize));
+    else if (opts?.limit != null) params.set('limit', String(opts.limit));
     if (opts?.projectId) params.set('projectId', opts.projectId);
     const q = params.toString();
-    return request<
-      {
+    return request<{
+      items: {
         id: string;
         actorUserId: string;
         tokenId?: string;
@@ -111,8 +113,11 @@ export const api = {
         projectId?: string;
         meta?: Record<string, unknown>;
         createdAt: string;
-      }[]
-    >(`/api/audit${q ? `?${q}` : ''}`);
+      }[];
+      total: number;
+      page: number;
+      pageSize: number;
+    }>(`/api/audit${q ? `?${q}` : ''}`);
   },
 
   getProjects: () => request<Project[]>('/api/projects'),

@@ -11,6 +11,14 @@ import {
   Activity,
 } from 'lucide-react';
 import { Button } from '../ui/Button';
+import {
+  Dropdown,
+  DropdownContent,
+  DropdownItem,
+  DropdownLabel,
+  DropdownSeparator,
+  DropdownTrigger,
+} from '../ui/Dropdown';
 import { ExportImportModal } from '../common/ExportImportModal';
 
 export const Navbar: React.FC = () => {
@@ -24,7 +32,6 @@ export const Navbar: React.FC = () => {
     createProject,
   } = useKanban();
 
-  const [isProjectDropdownOpen, setIsProjectDropdownOpen] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
   const [newProjName, setNewProjName] = useState('');
@@ -34,26 +41,18 @@ export const Navbar: React.FC = () => {
     e.preventDefault();
     if (!newProjName.trim() || !newProjKey.trim()) return;
 
-    createProject(
-      newProjName.trim(),
-      'Glass workspace',
-      newProjKey.trim(),
-      '#8B5CF6'
-    );
+    createProject(newProjName.trim(), 'Glass workspace', newProjKey.trim(), '#8B5CF6');
 
     setNewProjName('');
     setNewProjKey('');
     setIsNewProjectModalOpen(false);
-    setIsProjectDropdownOpen(false);
   };
 
   return (
     <>
       <header className="bg-glass backdrop-blur-xl border-b border-glass sticky top-0 z-40">
         <div className="px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          {/* Left section: Logo & Project Switcher */}
           <div className="flex items-center gap-4">
-            {/* Logo */}
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-lg bg-accent-blue text-white flex items-center justify-center shadow-card">
                 <Activity className="w-4.5 h-4.5" />
@@ -70,73 +69,55 @@ export const Navbar: React.FC = () => {
 
             <div className="h-5 w-px bg-glassborder-light hidden sm:block" />
 
-            {/* Project Selector Dropdown */}
-            <div className="relative">
-              <button
-                onClick={() => setIsProjectDropdownOpen(!isProjectDropdownOpen)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-canvas hover:bg-surface-muted text-xs font-medium text-ink transition-colors shadow-card"
+            <Dropdown>
+              <DropdownTrigger
+                className="bg-canvas hover:bg-surface-muted rounded-lg border-border max-w-[200px] sm:max-w-[220px]"
+                aria-label="Switch workspace"
               >
                 <span
                   className="w-2 h-2 rounded-full shrink-0"
-                  style={{ backgroundColor: activeProject?.color || '#8B5CF6', color: activeProject?.color || '#8B5CF6' }}
+                  style={{
+                    backgroundColor: activeProject?.color || '#8B5CF6',
+                    color: activeProject?.color || '#8B5CF6',
+                  }}
                 />
                 <span className="truncate max-w-[130px] sm:max-w-[180px]">
                   {activeProject?.name}
                 </span>
-                <ChevronDown className="w-3 h-3 text-ink-subtle" />
-              </button>
-
-              {isProjectDropdownOpen && (
-                <div className="absolute left-0 top-full mt-2 w-64 bg-glass-strong rounded-xl shadow-card border border-glass py-1.5 z-50 animate-scale-up">
-                  <div className="px-3.5 py-1.5 text-[10px] font-mono uppercase tracking-wider text-ink-subtle">
-                    Workspaces
-                  </div>
-                  <div className="max-h-48 overflow-y-auto py-0.5">
-                    {projects.map((proj) => (
-                      <button
-                        key={proj.id}
-                        onClick={() => {
-                          setActiveProjectId(proj.id);
-                          setIsProjectDropdownOpen(false);
-                        }}
-                        className={`w-full px-3.5 py-2 text-xs text-left flex items-center justify-between transition-colors ${
-                          proj.id === activeProject?.id
-                            ? 'bg-surface-muted text-ink font-medium'
-                            : 'text-ink-muted hover:bg-canvas hover:text-ink'
-                        }`}
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <span
-                            className="w-2 h-2 rounded-full"
-                            style={{ backgroundColor: proj.color, color: proj.color }}
-                          />
-                          <span className="truncate">{proj.name}</span>
-                        </span>
-                        <span className="text-[10px] font-mono text-ink-subtle">
-                          {proj.key}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-
-                  <div className="border-t border-border my-1" />
-
-                  <button
-                    onClick={() => {
-                      setIsProjectDropdownOpen(false);
-                      setIsNewProjectModalOpen(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-xs text-left text-accent-blue hover:bg-accent-blue-soft flex items-center gap-2 font-medium transition-colors"
+                <ChevronDown className="w-3 h-3 text-ink-subtle shrink-0" aria-hidden="true" />
+              </DropdownTrigger>
+              <DropdownContent widthClass="w-64">
+                <DropdownLabel>Workspaces</DropdownLabel>
+                {projects.map((proj) => (
+                  <DropdownItem
+                    key={proj.id}
+                    selected={proj.id === activeProject?.id}
+                    onSelect={() => setActiveProjectId(proj.id)}
                   >
-                    <FolderPlus className="w-3.5 h-3.5" />
-                    New Workspace
-                  </button>
-                </div>
-              )}
-            </div>
+                    <span className="flex items-center gap-2 truncate flex-1 min-w-0">
+                      <span
+                        className="w-2 h-2 rounded-full shrink-0"
+                        style={{ backgroundColor: proj.color, color: proj.color }}
+                      />
+                      <span className="truncate">{proj.name}</span>
+                    </span>
+                    <span className="text-[10px] font-mono text-ink-subtle shrink-0">
+                      {proj.key}
+                    </span>
+                  </DropdownItem>
+                ))}
+                <DropdownSeparator />
+                <DropdownItem
+                  className="text-accent-blue hover:bg-accent-blue-soft font-medium"
+                  onSelect={() => setIsNewProjectModalOpen(true)}
+                >
+                  <FolderPlus className="w-3.5 h-3.5" aria-hidden="true" />
+                  New Workspace
+                </DropdownItem>
+              </DropdownContent>
+            </Dropdown>
           </div>
 
-          {/* Middle: View Mode Switcher */}
           <div className="flex items-center bg-canvas p-1 rounded-lg border border-border shadow-card backdrop-blur-md">
             <button
               onClick={() => setActiveView('board')}
@@ -175,9 +156,7 @@ export const Navbar: React.FC = () => {
             </button>
           </div>
 
-          {/* Right section: New Task CTA, Backup */}
           <div className="flex items-center gap-3">
-            {/* Backup / Export / Import Trigger */}
             <button
               onClick={() => setIsBackupModalOpen(true)}
               className="p-1.5 rounded-lg text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors border border-transparent hover:border-border"
@@ -186,7 +165,6 @@ export const Navbar: React.FC = () => {
               <Database className="w-4 h-4" />
             </button>
 
-            {/* New Task CTA */}
             <Button
               variant="primary"
               size="sm"
@@ -199,7 +177,6 @@ export const Navbar: React.FC = () => {
         </div>
       </header>
 
-      {/* New Project Modal (Glass) */}
       {isNewProjectModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -207,9 +184,7 @@ export const Navbar: React.FC = () => {
             onClick={() => setIsNewProjectModalOpen(false)}
           />
           <div className="relative w-full max-w-md bg-glass-strong rounded-2xl p-6 shadow-card border border-glass z-10 animate-scale-up">
-            <h3 className="text-base font-semibold text-ink mb-1">
-              Create New Workspace
-            </h3>
+            <h3 className="text-base font-semibold text-ink mb-1">Create New Workspace</h3>
             <p className="text-xs text-ink-muted mb-5">
               Launch a new analytics environment for your team.
             </p>
@@ -276,7 +251,6 @@ export const Navbar: React.FC = () => {
         </div>
       )}
 
-      {/* Backup Modal */}
       <ExportImportModal
         isOpen={isBackupModalOpen}
         onClose={() => setIsBackupModalOpen(false)}

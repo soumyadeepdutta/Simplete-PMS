@@ -18,10 +18,16 @@ import {
 } from 'lucide-react';
 import { AvatarGroup } from '../ui/Avatar';
 import { Button } from '../ui/Button';
+import {
+  Dropdown,
+  DropdownContent,
+  DropdownItem,
+  DropdownSeparator,
+  DropdownTrigger,
+} from '../ui/Dropdown';
 import { ExportImportModal } from '../common/ExportImportModal';
 import { EditProjectModal } from '../common/EditProjectModal';
 import { MembersModal } from '../auth/MembersModal';
-import { AuditModal } from '../auth/AuditModal';
 import { ViewMode } from '../../types/kanban';
 import { cn } from '../../utils/cn';
 
@@ -43,14 +49,13 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
     openNewTaskModal,
     deleteProject,
     updateProject,
+    setWorkspaceMode,
   } = useKanban();
   const { can } = useAuth();
 
   const [isBackupOpen, setIsBackupOpen] = useState(false);
-  const [isMoreOpen, setIsMoreOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [membersOpen, setMembersOpen] = useState(false);
-  const [auditOpen, setAuditOpen] = useState(false);
 
   if (!activeProject) return null;
 
@@ -65,7 +70,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
   const activeTabId: ViewMode = isTasksTab ? 'board' : activeView;
 
   const handleDeleteProject = () => {
-    setIsMoreOpen(false);
     if (
       !window.confirm(
         `Delete project "${activeProject.name}"? This cannot be undone.`
@@ -120,96 +124,54 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
               <Star className={cn('w-4 h-4', isFavorited && 'fill-accent-orange')} />
             </button>
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setIsMoreOpen((v) => !v)}
-                className="p-2 rounded-xl text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors"
+            <Dropdown align="end">
+              <DropdownTrigger
+                aria-label="More project actions"
                 title="More"
+                className="p-2 rounded-xl text-ink-subtle hover:text-ink hover:bg-surface-muted border-transparent shadow-none bg-transparent"
               >
-                <MoreHorizontal className="w-4 h-4" />
-              </button>
-              {isMoreOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-52 bg-glass-strong rounded-xl shadow-elevated border border-glass py-1.5 z-50">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsMoreOpen(false);
-                      setIsBackupOpen(true);
-                    }}
-                    className="w-full px-3.5 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2"
-                  >
-                    <Database className="w-3.5 h-3.5" />
-                    Backup & Export
-                  </button>
-                  {can('project:update') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreOpen(false);
-                        setEditOpen(true);
-                      }}
-                      className="w-full px-3.5 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2"
-                    >
-                      <Pencil className="w-3.5 h-3.5" />
-                      Edit project
-                    </button>
-                  )}
-                  {(can('member:invite') || can('member:update') || can('member:remove')) && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreOpen(false);
-                        setMembersOpen(true);
-                      }}
-                      className="w-full px-3.5 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2"
-                    >
-                      <Users className="w-3.5 h-3.5" />
-                      Members
-                    </button>
-                  )}
-                  {can('audit:read') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreOpen(false);
-                        setAuditOpen(true);
-                      }}
-                      className="w-full px-3.5 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2"
-                    >
-                      <ScrollText className="w-3.5 h-3.5" />
-                      Audit log
-                    </button>
-                  )}
-                  {can('project:create') && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setIsMoreOpen(false);
-                        onNewProjectClick?.();
-                      }}
-                      className="w-full px-3.5 py-2 text-xs text-left text-ink-muted hover:bg-surface-muted hover:text-ink flex items-center gap-2"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      New Project
-                    </button>
-                  )}
-                  {can('project:delete') && (
-                    <>
-                      <div className="my-1 border-t border-border" />
-                      <button
-                        type="button"
-                        onClick={handleDeleteProject}
-                        className="w-full px-3.5 py-2 text-xs text-left text-accent-red hover:bg-accent-red-soft flex items-center gap-2"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                        Delete project
-                      </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
+                <MoreHorizontal className="w-4 h-4" aria-hidden="true" />
+              </DropdownTrigger>
+              <DropdownContent widthClass="w-52">
+                <DropdownItem onSelect={() => setIsBackupOpen(true)}>
+                  <Database className="w-3.5 h-3.5" aria-hidden="true" />
+                  Backup & Export
+                </DropdownItem>
+                {can('project:update') && (
+                  <DropdownItem onSelect={() => setEditOpen(true)}>
+                    <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
+                    Edit project
+                  </DropdownItem>
+                )}
+                {(can('member:invite') || can('member:update') || can('member:remove')) && (
+                  <DropdownItem onSelect={() => setMembersOpen(true)}>
+                    <Users className="w-3.5 h-3.5" aria-hidden="true" />
+                    Members
+                  </DropdownItem>
+                )}
+                {can('audit:read') && (
+                  <DropdownItem onSelect={() => setWorkspaceMode('audit')}>
+                    <ScrollText className="w-3.5 h-3.5" aria-hidden="true" />
+                    Audit log
+                  </DropdownItem>
+                )}
+                {can('project:create') && (
+                  <DropdownItem onSelect={() => onNewProjectClick?.()}>
+                    <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                    New Project
+                  </DropdownItem>
+                )}
+                {can('project:delete') && (
+                  <>
+                    <DropdownSeparator />
+                    <DropdownItem destructive onSelect={handleDeleteProject}>
+                      <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
+                      Delete project
+                    </DropdownItem>
+                  </>
+                )}
+              </DropdownContent>
+            </Dropdown>
 
             <button
               type="button"
@@ -333,9 +295,6 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
       <ExportImportModal isOpen={isBackupOpen} onClose={() => setIsBackupOpen(false)} />
       <EditProjectModal isOpen={editOpen} onClose={() => setEditOpen(false)} />
       <MembersModal isOpen={membersOpen} onClose={() => setMembersOpen(false)} />
-      {can('audit:read') && (
-        <AuditModal isOpen={auditOpen} onClose={() => setAuditOpen(false)} />
-      )}
     </>
   );
 };

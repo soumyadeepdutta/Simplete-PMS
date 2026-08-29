@@ -82,7 +82,7 @@ export interface MyTask extends Task {
   projectColor: string;
 }
 
-export type WorkspaceMode = 'project' | 'my-tasks';
+export type WorkspaceMode = 'project' | 'my-tasks' | 'audit';
 
 export interface Column {
   id: string;

@@ -261,7 +261,12 @@ export async function registerApiRoutes(app: FastifyInstance): Promise<void> {
   app.post('/api/import', auth, async (req) => importProjects(req.auth!, req.body));
   app.get('/api/audit', auth, async (req) => {
     const q = z
-      .object({ limit: z.coerce.number().optional(), projectId: z.string().optional() })
+      .object({
+        limit: z.coerce.number().optional(),
+        page: z.coerce.number().int().min(1).optional(),
+        pageSize: z.coerce.number().int().min(1).max(100).optional(),
+        projectId: z.string().optional(),
+      })
       .parse(req.query ?? {});
     return audit.listAudit(req.auth!, q);
   });

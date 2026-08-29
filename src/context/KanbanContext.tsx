@@ -15,6 +15,11 @@ import { storageService } from '../services/storageService';
 import { projectApi } from '../services/apiMock';
 import { getPriorityWeight } from '../utils/priorityUtils';
 import { getDueStatus } from '../utils/dateUtils';
+import {
+  deliverablesBlockDoneMessage,
+  incompleteDeliverableCount,
+  isDoneColumnTitle,
+} from '../utils/taskStatus';
 import { useAuth } from './AuthContext';
 import { ApiError } from '../services/api';
 
@@ -307,6 +312,14 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (!task) return;
 
     const destCol = activeProject.columns.find((c) => c.id === destColId);
+    if (destCol && isDoneColumnTitle(destCol.title) && sourceColId !== destColId) {
+      const incomplete = incompleteDeliverableCount(task.subtasks);
+      if (incomplete > 0) {
+        showToast(deliverablesBlockDoneMessage(incomplete), 'warning');
+        return;
+      }
+    }
+
     const destCount =
       activeProject.tasks.filter((t) => t.columnId === destColId && t.id !== taskId).length + 1;
     if (destCol?.wipLimit && destCount > destCol.wipLimit && sourceColId !== destColId) {
@@ -315,7 +328,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         'warning'
       );
     }
-    if (destCol?.title.toLowerCase().includes('done') && sourceColId !== destColId) {
+    if (destCol && isDoneColumnTitle(destCol.title) && sourceColId !== destColId) {
       confetti({
         particleCount: 80,
         spread: 60,

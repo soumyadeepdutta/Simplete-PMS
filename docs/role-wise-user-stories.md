@@ -296,7 +296,8 @@ Default seed (factory) permissions:
 
 - Requires `task:move`.
 - Destination index is honored; status_change activity is recorded.
-- Moving into a “Done”-like column may trigger confetti celebration in the UI.
+- Moving into a “Done”-like column (title matches `/done/i`) is rejected when the task has any incomplete deliverables (subtasks); tasks with no deliverables may move freely.
+- Moving into a “Done”-like column may trigger confetti celebration in the UI when allowed.
 
 #### US-OWNER-017 — Comment on tasks
 
@@ -625,6 +626,7 @@ Default seed (factory) permissions:
 
 - Requires `task:move`.
 - Keyboard/single-pointer move path available for WCAG-oriented use.
+- Same Done-column deliverables gate as US-OWNER-016 (server 400 + UI toast).
 
 #### US-MEMBER-009 — Manage subtasks and comments
 

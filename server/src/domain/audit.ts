@@ -28,27 +28,55 @@ export async function writeAudit(
   await cols().auditLog.insertOne(doc);
 }
 
+export type AuditListResult = {
+  items: {
+    id: string;
+    actorUserId: string;
+    tokenId?: string;
+    action: string;
+    resourceType: string;
+    resourceId?: string;
+    projectId?: string;
+    meta?: Record<string, unknown>;
+    createdAt: string;
+  }[];
+  total: number;
+  page: number;
+  pageSize: number;
+};
+
 export async function listAudit(
   ctx: AuthContext,
-  opts: { limit?: number; projectId?: string } = {}
-) {
+  opts: { limit?: number; page?: number; pageSize?: number; projectId?: string } = {}
+): Promise<AuditListResult> {
   requirePerm(ctx, 'audit:read');
-  const limit = Math.min(opts.limit ?? 100, 500);
+
+  // Prefer pageSize; fall back to legacy `limit` for callers that still send it.
+  const pageSize = Math.min(Math.max(opts.pageSize ?? opts.limit ?? 25, 1), 100);
+  const page = Math.max(opts.page ?? 1, 1);
+  const skip = (page - 1) * pageSize;
   const filter = opts.projectId ? { projectId: opts.projectId } : {};
-  const docs = await cols()
-    .auditLog.find(filter)
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .toArray();
-  return docs.map((d) => ({
-    id: d._id,
-    actorUserId: d.actorUserId,
-    tokenId: d.tokenId,
-    action: d.action,
-    resourceType: d.resourceType,
-    resourceId: d.resourceId,
-    projectId: d.projectId,
-    meta: d.meta,
-    createdAt: d.createdAt,
-  }));
+
+  const collection = cols().auditLog;
+  const [total, docs] = await Promise.all([
+    collection.countDocuments(filter),
+    collection.find(filter).sort({ createdAt: -1 }).skip(skip).limit(pageSize).toArray(),
+  ]);
+
+  return {
+    items: docs.map((d) => ({
+      id: d._id,
+      actorUserId: d.actorUserId,
+      tokenId: d.tokenId,
+      action: d.action,
+      resourceType: d.resourceType,
+      resourceId: d.resourceId,
+      projectId: d.projectId,
+      meta: d.meta,
+      createdAt: d.createdAt,
+    })),
+    total,
+    page,
+    pageSize,
+  };
 }

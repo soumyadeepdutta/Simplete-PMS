@@ -1250,7 +1250,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         post: {
           tags: ['Tasks'],
           summary: 'Create task',
-          description: 'Requires `task:create`.',
+          description:
+            'Requires `task:create`. Creating into a column whose title matches `/done/i` is rejected if the task has any incomplete deliverables (subtasks).',
           operationId: 'createTask',
           security: authSecurity,
           parameters: [{ $ref: '#/components/parameters/projectId' }],
@@ -1342,7 +1343,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         post: {
           tags: ['Tasks'],
           summary: 'Move task to column/index',
-          description: 'Requires `task:move`.',
+          description:
+            'Requires `task:move`. Moving into a column whose title matches `/done/i` is rejected (400) if the task has any incomplete deliverables (subtasks). Tasks with no deliverables may move to Done freely.',
           operationId: 'moveTask',
           security: authSecurity,
           parameters: [
@@ -1469,7 +1471,8 @@ export function buildOpenApiSpec(): Record<string, unknown> {
         get: {
           tags: ['Members'],
           summary: 'List workspace members',
-          description: 'Requires `project:read`.',
+          description:
+            'Requires `project:read`. Returns active members only (soft-removed / `disabled` users are omitted).',
           operationId: 'listMembers',
           security: authSecurity,
           responses: {
@@ -1532,7 +1535,7 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           tags: ['Members'],
           summary: 'Remove member',
           description:
-            'Requires `member:remove`. Soft-disables user; cannot remove owner or self.',
+            'Requires `member:remove`. Soft-disables the user, removes them from all project member lists, and ends their sessions. They no longer appear in `GET /api/members`. Cannot remove owner or self. Re-inviting the same email reactivates the account.',
           operationId: 'removeMember',
           security: authSecurity,
           parameters: [{ $ref: '#/components/parameters/userId' }],
@@ -1696,15 +1699,27 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           tags: ['Audit'],
           summary: 'List audit events',
           description:
-            'Requires `audit:read` (owner/admin). Default limit 100, max 500; newest first.',
+            'Requires `audit:read` (owner/admin). Paginated; newest first. Default pageSize 25, max 100.',
           operationId: 'listAudit',
           security: authSecurity,
           parameters: [
             {
+              name: 'page',
+              in: 'query',
+              description: '1-based page index (default 1)',
+              schema: { type: 'integer', minimum: 1, default: 1 },
+            },
+            {
+              name: 'pageSize',
+              in: 'query',
+              description: 'Items per page (default 25, max 100)',
+              schema: { type: 'integer', minimum: 1, maximum: 100, default: 25 },
+            },
+            {
               name: 'limit',
               in: 'query',
-              description: 'Defaults to 100; capped at 500',
-              schema: { type: 'integer', minimum: 1, maximum: 500, default: 100 },
+              description: 'Legacy alias for pageSize',
+              schema: { type: 'integer', minimum: 1, maximum: 100 },
             },
             {
               name: 'projectId',
@@ -1714,8 +1729,17 @@ export function buildOpenApiSpec(): Record<string, unknown> {
           ],
           responses: {
             '200': {
-              description: 'Audit entries',
-              ...jsonContent({ type: 'array', items: ref('AuditEntry') }),
+              description: 'Paginated audit entries',
+              ...jsonContent({
+                type: 'object',
+                required: ['items', 'total', 'page', 'pageSize'],
+                properties: {
+                  items: { type: 'array', items: ref('AuditEntry') },
+                  total: { type: 'integer', minimum: 0 },
+                  page: { type: 'integer', minimum: 1 },
+                  pageSize: { type: 'integer', minimum: 1 },
+                },
+              }),
             },
             '400': errorResponses['400'],
             '401': errorResponses['401'],

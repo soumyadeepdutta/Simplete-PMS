@@ -134,7 +134,7 @@
 }
 
 /*
-  Unlayered Soft UI utilities — beat Tailwind @layer utilities so dark-mode
+  Unlayered Simplete utilities — beat Tailwind @layer utilities so dark-mode
   tokens always win (fixes stale JIT hex classes / missing bg-surface).
 */
 .bg-page { background-color: var(--color-page) !important; }
@@ -229,43 +229,6 @@
 
 .border-glass {
   border-color: var(--color-glass-border) !important;
-}
-
-/* Themed native selects — closed control matches glass UI */
-.ui-select {
-  color-scheme: light;
-  background-color: var(--color-glass) !important;
-  color: var(--color-text) !important;
-  border-color: var(--color-glass-border) !important;
-  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
-}
-
-.ui-select:hover {
-  border-color: var(--color-border-strong) !important;
-}
-
-.ui-select:focus {
-  border-color: var(--color-border-strong) !important;
-}
-
-.ui-select option,
-.ui-select optgroup {
-  background-color: var(--color-surface);
-  color: var(--color-text);
-}
-
-html.dark .ui-select,
-.dark .ui-select {
-  color-scheme: dark;
-}
-
-@media (prefers-reduced-transparency: reduce) {
-  .ui-select {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
-    background-color: var(--color-surface) !important;
-  }
 }
 
 @media (prefers-reduced-transparency: reduce) {

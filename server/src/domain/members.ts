@@ -4,6 +4,7 @@ import type { AuthContext } from '../auth/rbac.js';
 import { requirePerm } from '../auth/rbac.js';
 import { toPublicUser } from '../auth/context.js';
 import { hashPassword } from '../auth/crypto.js';
+import { destroyAllUserSessions } from '../auth/sessions.js';
 import { writeAudit } from './audit.js';
 import { getProjectDoc } from './projects.js';
 import { newId } from '../shared/id.js';
@@ -18,9 +19,13 @@ import {
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80';
 
+/** Active (non-disabled) workspace members only. */
 export async function listMembers(ctx: AuthContext) {
   requirePerm(ctx, 'project:read');
-  const docs = await cols().users.find({}).sort({ createdAt: 1 }).toArray();
+  const docs = await cols()
+    .users.find({ disabled: { $ne: true } })
+    .sort({ createdAt: 1 })
+    .toArray();
   return docs.map(toPublicUser);
 }
 
@@ -29,9 +34,38 @@ export async function inviteMember(ctx: AuthContext, raw: InviteMemberInput) {
   const input = InviteMemberInputSchema.parse(raw);
 
   const existing = await cols().users.findOne({ email: input.email.toLowerCase() });
-  if (existing) throw conflict('User with this email already exists');
+  if (existing && !existing.disabled) {
+    throw conflict('User with this email already exists');
+  }
 
   const now = new Date().toISOString();
+
+  // Re-invite: reactivate a previously removed (disabled) account
+  if (existing?.disabled) {
+    const $set: Partial<UserDoc> = {
+      passwordHash: await hashPassword(input.password),
+      name: input.name,
+      title: input.title ?? existing.title ?? '',
+      role: input.role,
+      disabled: false,
+      updatedAt: now,
+    };
+    const result = await cols().users.findOneAndUpdate(
+      { _id: existing._id },
+      { $set },
+      { returnDocument: 'after' }
+    );
+    if (!result) throw notFound('User not found');
+    await cols().projects.updateMany({}, { $addToSet: { members: { userId: existing._id } } });
+    await writeAudit(ctx, {
+      action: 'member.invite',
+      resourceType: 'user',
+      resourceId: existing._id,
+      meta: { reactivated: true },
+    });
+    return toPublicUser(result);
+  }
+
   const doc: UserDoc = {
     _id: newId('user'),
     email: input.email.toLowerCase(),
@@ -98,7 +132,7 @@ export async function removeMember(ctx: AuthContext, userId: string) {
     { $set: { disabled: true, updatedAt: new Date().toISOString() } }
   );
   await cols().projects.updateMany({}, { $pull: { members: { userId } } });
-  // Also remove from project member lists for tasks assignees — leave historical IDs
+  await destroyAllUserSessions(userId);
 
   await writeAudit(ctx, {
     action: 'member.remove',
