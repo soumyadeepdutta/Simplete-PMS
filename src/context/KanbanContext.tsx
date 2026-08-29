@@ -1,4 +1,12 @@
-import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  useRef,
+} from 'react';
 import confetti from 'canvas-confetti';
 import {
   Project,
@@ -122,6 +130,11 @@ const DEFAULT_FILTERS: FilterState = {
 
 const KanbanContext = createContext<KanbanContextType | undefined>(undefined);
 
+/** How often to pull remote board changes (MCP / other clients) while the tab is visible. */
+const SYNC_POLL_MS = 8_000;
+/** Skip applying a soft sync briefly after optimistic local writes. */
+const LOCAL_WRITE_GRACE_MS = 2_500;
+
 function replaceProject(projects: Project[], next: Project): Project[] {
   const exists = projects.some((p) => p.id === next.id);
   if (!exists) return [...projects, next];
@@ -156,6 +169,17 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     message: string;
     type: 'success' | 'info' | 'warning' | 'error';
   } | null>(null);
+
+  const lastLocalWriteAt = useRef(0);
+  const softSyncInFlight = useRef(false);
+  const activeProjectIdRef = useRef(activeProjectId);
+  const workspaceModeRef = useRef(workspaceMode);
+  activeProjectIdRef.current = activeProjectId;
+  workspaceModeRef.current = workspaceMode;
+
+  const noteLocalWrite = useCallback(() => {
+    lastLocalWriteAt.current = Date.now();
+  }, []);
 
   const showToast = (
     message: string,
@@ -193,9 +217,59 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [user]);
 
+  /** Background refetch for MCP/API changes — no loading spinner, keeps active project. */
+  const softSync = useCallback(async () => {
+    if (!user) return;
+    if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+    if (Date.now() - lastLocalWriteAt.current < LOCAL_WRITE_GRACE_MS) return;
+    if (softSyncInFlight.current) return;
+    softSyncInFlight.current = true;
+    try {
+      if (workspaceModeRef.current === 'my-tasks') {
+        const res = await projectApi.getMyTasks();
+        if (Date.now() - lastLocalWriteAt.current < LOCAL_WRITE_GRACE_MS) return;
+        setMyTasks(res.tasks);
+        return;
+      }
+
+      const projectId = activeProjectIdRef.current;
+      if (projectId) {
+        const next = await projectApi.getProject(projectId);
+        if (Date.now() - lastLocalWriteAt.current < LOCAL_WRITE_GRACE_MS) return;
+        setProjects((prev) => replaceProject(prev, next));
+      } else {
+        const list = await projectApi.getProjects();
+        if (Date.now() - lastLocalWriteAt.current < LOCAL_WRITE_GRACE_MS) return;
+        setProjects(list);
+      }
+    } catch {
+      // Silent — background sync should not toast on transient failures
+    } finally {
+      softSyncInFlight.current = false;
+    }
+  }, [user]);
+
   useEffect(() => {
     void refreshProjects();
   }, [refreshProjects]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const syncIfVisible = () => {
+      if (document.visibilityState === 'visible') void softSync();
+    };
+
+    document.addEventListener('visibilitychange', syncIfVisible);
+    window.addEventListener('focus', syncIfVisible);
+    const timer = window.setInterval(syncIfVisible, SYNC_POLL_MS);
+
+    return () => {
+      document.removeEventListener('visibilitychange', syncIfVisible);
+      window.removeEventListener('focus', syncIfVisible);
+      window.clearInterval(timer);
+    };
+  }, [user, softSync]);
 
   useEffect(() => {
     if (activeProjectId) storageService.saveActiveProjectId(activeProjectId);
@@ -356,6 +430,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       showToast('🎉 Task completed! Great job!', 'success');
     }
 
+    noteLocalWrite();
     // Optimistic
     setProjects((prev) =>
       prev.map((p) => {
@@ -390,6 +465,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const [moved] = cols.splice(sourceIndex, 1);
     cols.splice(destIndex, 0, moved);
     const reorderedCols = cols.map((c, idx) => ({ ...c, order: idx }));
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) =>
         p.id === activeProject.id
@@ -449,6 +525,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       updatedAt: new Date().toISOString(),
     };
 
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) =>
         p.id === activeProject.id ? { ...p, tasks: [placeholder, ...p.tasks] } : p
@@ -495,6 +572,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       return;
     }
 
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) => {
         if (p.id !== activeProject.id) return p;
@@ -537,6 +615,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteTask = (taskId: string) => {
     if (!activeProject) return;
     const taskToDelete = activeProject.tasks.find((t) => t.id === taskId);
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) =>
         p.id === activeProject.id
@@ -561,6 +640,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newSubtasks = task.subtasks.map((st) =>
       st.id === subtaskId ? { ...st, completed: !st.completed } : st
     );
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) =>
         p.id === activeProject.id
@@ -585,6 +665,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addSubtask = (taskId: string, title: string) => {
     if (!activeProject || !title.trim()) return;
+    noteLocalWrite();
     void projectApi
       .getProject(activeProject.id)
       .then(async () => {
@@ -599,6 +680,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const deleteSubtask = (taskId: string, subtaskId: string) => {
     if (!activeProject) return;
+    noteLocalWrite();
     void (async () => {
       try {
         const { api } = await import('../services/api');
@@ -614,6 +696,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const addComment = (taskId: string, content: string, _user: User) => {
     if (!activeProject || !content.trim()) return;
+    noteLocalWrite();
     void (async () => {
       try {
         const { api } = await import('../services/api');
@@ -630,6 +713,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const createColumn = (title: string, color: string, wipLimit?: number) => {
     if (!activeProject) return;
+    noteLocalWrite();
     void projectApi
       .createColumn(activeProject.id, {
         title,
@@ -649,6 +733,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const updateColumn = (colId: string, updates: Partial<Column>) => {
     if (!activeProject) return;
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) => {
         if (p.id !== activeProject.id) return p;
@@ -686,6 +771,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const createProject = (name: string, description: string, key: string, color: string) => {
+    noteLocalWrite();
     void projectApi
       .createProject({ name, description, key, color })
       .then((proj) => {
@@ -697,6 +783,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const updateProject = (projectId: string, updates: Partial<Project>) => {
+    noteLocalWrite();
     setProjects((prev) =>
       prev.map((p) => (p.id === projectId ? { ...p, ...updates } : p))
     );
@@ -714,6 +801,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       showToast('Cannot delete the last project.', 'error');
       return;
     }
+    noteLocalWrite();
     void projectApi
       .deleteProject(projectId)
       .then(() => {
@@ -730,6 +818,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     body: { name: string; color?: string; bgColor?: string; textColor?: string }
   ) => {
     try {
+      noteLocalWrite();
       const tag = await projectApi.createTag(projectId, body);
       setProjects((prev) =>
         prev.map((p) =>
@@ -754,6 +843,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   ) => {
     try {
+      noteLocalWrite();
       const tag = await projectApi.updateTag(projectId, tagId, body);
       setProjects((prev) =>
         prev.map((p) => {
@@ -776,6 +866,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const deleteTag = async (projectId: string, tagId: string) => {
     try {
+      noteLocalWrite();
       await projectApi.deleteTag(projectId, tagId);
       setProjects((prev) =>
         prev.map((p) => {
@@ -812,6 +903,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const importData = (jsonStr: string): boolean => {
     try {
       const parsed = JSON.parse(jsonStr);
+      noteLocalWrite();
       void projectApi
         .importProjects(parsed)
         .then((imported) => {
