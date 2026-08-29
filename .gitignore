@@ -1,0 +1,67 @@
+# Dependencies (root frontend + server)
+node_modules/
+**/node_modules/
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+!**/.env.example
+server/.env
+
+# Build outputs
+dist/
+dist-ssr/
+**/dist/
+build/
+**/build/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Vite / tooling caches
+.vite/
+**/.vite/
+.turbo/
+.cache/
+**/.cache/
+*.local
+
+# Test / coverage
+coverage/
+**/coverage/
+.nyc_output/
+
+# Agent / local tooling (this monorepo)
+.agents/
+.browser-validate/
+.cursor/
+skills-lock.json
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Optional local overrides
+*.pem
+*.key

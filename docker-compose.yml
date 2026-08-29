@@ -1,0 +1,34 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - simplete_mongo:/data/db
+    ports:
+      - "27017:27017"
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      mongo:
+        condition: service_healthy
+    env_file:
+      - ./server/.env.example
+    environment:
+      MONGODB_URI: mongodb://mongo:27017/simplete
+      COOKIE_SECRET: ${COOKIE_SECRET:-change-me-in-production-please}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:4000,127.0.0.1:4000,api:4000}
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+    ports:
+      - "4000:4000"
+
+volumes:
+  simplete_mongo:

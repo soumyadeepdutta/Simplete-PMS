@@ -1,0 +1,314 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Icy blue glass family (default; color themes override accents/atmosphere) */
+    --color-page: #E6F4FF;
+    --color-canvas: #F5FAFF;
+    --color-surface: #FFFFFF;
+    --color-surface-muted: #EAF3FB;
+    --color-sidebar: rgba(255, 255, 255, 0.62);
+    --color-rail: rgba(255, 255, 255, 0.68);
+    --color-border: rgba(0, 122, 255, 0.10);
+    --color-border-strong: rgba(0, 122, 255, 0.20);
+    --color-text: #2D3436;
+    --color-text-muted: #6B7C85;
+    --color-text-subtle: #95A5A6;
+    /* Primary maps onto accent-blue class names */
+    --color-accent-blue: #007AFF;
+    --color-accent-blue-soft: #D6EBFF;
+    --color-accent-green: #4CAF50;
+    --color-accent-green-soft: #E8F5E9;
+    --color-accent-red: #FF5252;
+    --color-accent-red-soft: #FFE8E8;
+    --color-accent-orange: #EA580C;
+    --color-accent-orange-soft: #FFEDD5;
+    --color-accent-purple: #7C3AED;
+    --color-accent-purple-soft: #EDE9FE;
+    --color-accent-yellow: #CA8A04;
+    --color-accent-yellow-soft: #FEF9C3;
+    /* Glass fills — ~60% white for readable contrast */
+    --color-glass: rgba(255, 255, 255, 0.58);
+    --color-glass-strong: rgba(255, 255, 255, 0.78);
+    --color-glass-border: rgba(255, 255, 255, 0.55);
+    --color-glass-highlight: rgba(255, 255, 255, 0.72);
+    --glass-blur: 22px;
+    /* Atmosphere blobs (color themes override) */
+    --atm-blob-1: rgba(0, 122, 255, 0.22);
+    --atm-blob-2: rgba(56, 189, 248, 0.2);
+    --atm-blob-3: rgba(147, 197, 253, 0.28);
+    --atm-base-from: #E6F4FF;
+    --atm-base-mid: #F5FAFF;
+    --atm-base-to: #E6F4FF;
+    --scrollbar-thumb: rgba(0, 122, 255, 0.28);
+    --scrollbar-thumb-hover: rgba(0, 122, 255, 0.5);
+    /* Soft grey elevation */
+    --shadow-card:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 1px 2px rgba(15, 23, 42, 0.04),
+      0 8px 24px rgba(15, 23, 42, 0.06);
+    --shadow-card-hover:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 4px 12px rgba(15, 23, 42, 0.07),
+      0 16px 40px rgba(15, 23, 42, 0.08);
+    --shadow-elevated:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 8px 20px rgba(15, 23, 42, 0.08),
+      0 24px 48px rgba(15, 23, 42, 0.1);
+    --shadow-window:
+      inset 0 1px 0 rgba(255, 255, 255, 0.65),
+      0 12px 40px rgba(15, 23, 42, 0.1),
+      0 28px 64px rgba(15, 23, 42, 0.12);
+  }
+
+  html.dark,
+  .dark {
+    --color-page: #0B1220;
+    --color-canvas: #111827;
+    --color-surface: #1A2332;
+    --color-surface-muted: #1E293B;
+    --color-sidebar: rgba(15, 23, 42, 0.62);
+    --color-rail: rgba(15, 23, 42, 0.72);
+    --color-border: rgba(59, 130, 246, 0.14);
+    --color-border-strong: rgba(59, 130, 246, 0.26);
+    --color-text: #E8EEF6;
+    --color-text-muted: #94A3B8;
+    --color-text-subtle: #64748B;
+    --color-accent-blue: #3B82F6;
+    --color-accent-blue-soft: #1E3A5F;
+    --color-accent-green: #4ADE80;
+    --color-accent-green-soft: #14532D;
+    --color-accent-red: #FB7185;
+    --color-accent-red-soft: #7F1D1D;
+    --color-accent-orange: #FB923C;
+    --color-accent-orange-soft: #7C2D12;
+    --color-accent-purple: #A78BFA;
+    --color-accent-purple-soft: #4C1D95;
+    --color-accent-yellow: #FACC15;
+    --color-accent-yellow-soft: #713F12;
+    --color-glass: rgba(15, 23, 42, 0.62);
+    --color-glass-strong: rgba(15, 23, 42, 0.84);
+    --color-glass-border: rgba(255, 255, 255, 0.12);
+    --color-glass-highlight: rgba(255, 255, 255, 0.1);
+    --glass-blur: 24px;
+    --shadow-card:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      0 10px 28px rgba(0, 0, 0, 0.35);
+    --shadow-card-hover:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 4px 14px rgba(59, 130, 246, 0.08),
+      0 18px 40px rgba(0, 0, 0, 0.42);
+    --shadow-elevated:
+      inset 0 1px 0 var(--color-glass-highlight),
+      0 12px 32px rgba(59, 130, 246, 0.06),
+      0 24px 56px rgba(0, 0, 0, 0.5);
+    --shadow-window:
+      inset 0 1px 0 rgba(255, 255, 255, 0.08),
+      0 16px 48px rgba(0, 0, 0, 0.55);
+    --atm-blob-1: rgba(59, 130, 246, 0.16);
+    --atm-blob-2: rgba(37, 99, 235, 0.12);
+    --atm-blob-3: rgba(99, 102, 241, 0.1);
+    --atm-base-from: #0B1220;
+    --atm-base-mid: #111827;
+    --atm-base-to: #0B1220;
+    --scrollbar-thumb: rgba(59, 130, 246, 0.28);
+    --scrollbar-thumb-hover: rgba(59, 130, 246, 0.5);
+  }
+
+  body {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-color: var(--color-page);
+    color: var(--color-text);
+  }
+
+  #root {
+    color: var(--color-text);
+    border-color: var(--color-border);
+  }
+}
+
+/*
+  Unlayered Soft UI utilities — beat Tailwind @layer utilities so dark-mode
+  tokens always win (fixes stale JIT hex classes / missing bg-surface).
+*/
+.bg-page { background-color: var(--color-page) !important; }
+.bg-canvas { background-color: var(--color-canvas) !important; }
+.bg-surface { background-color: var(--color-surface) !important; }
+.bg-surface-muted { background-color: var(--color-surface-muted) !important; }
+.bg-sidebar {
+  background-color: var(--color-sidebar) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+.bg-rail {
+  background-color: var(--color-rail) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+.font-sans {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif !important;
+}
+
+.bg-accent-blue { background-color: var(--color-accent-blue) !important; }
+.bg-accent-blue-soft { background-color: var(--color-accent-blue-soft) !important; }
+.bg-accent-green { background-color: var(--color-accent-green) !important; }
+.bg-accent-green-soft { background-color: var(--color-accent-green-soft) !important; }
+.bg-accent-red { background-color: var(--color-accent-red) !important; }
+.bg-accent-red-soft { background-color: var(--color-accent-red-soft) !important; }
+.bg-accent-orange { background-color: var(--color-accent-orange) !important; }
+.bg-accent-orange-soft { background-color: var(--color-accent-orange-soft) !important; }
+.bg-accent-purple { background-color: var(--color-accent-purple) !important; }
+.bg-accent-purple-soft { background-color: var(--color-accent-purple-soft) !important; }
+.bg-accent-yellow { background-color: var(--color-accent-yellow) !important; }
+.bg-accent-yellow-soft { background-color: var(--color-accent-yellow-soft) !important; }
+
+.text-ink { color: var(--color-text) !important; }
+.text-ink-muted { color: var(--color-text-muted) !important; }
+.text-ink-subtle { color: var(--color-text-subtle) !important; }
+.text-accent-blue { color: var(--color-accent-blue) !important; }
+.text-accent-green { color: var(--color-accent-green) !important; }
+.text-accent-red { color: var(--color-accent-red) !important; }
+.text-accent-orange { color: var(--color-accent-orange) !important; }
+.text-accent-purple { color: var(--color-accent-purple) !important; }
+
+.border-border { border-color: var(--color-border) !important; }
+.border-border-strong { border-color: var(--color-border-strong) !important; }
+.divide-border > :not([hidden]) ~ :not([hidden]) { border-color: var(--color-border) !important; }
+
+.shadow-card { box-shadow: var(--shadow-card) !important; }
+.shadow-card-hover { box-shadow: var(--shadow-card-hover) !important; }
+.hover\:shadow-card-hover:hover { box-shadow: var(--shadow-card-hover) !important; }
+.shadow-elevated { box-shadow: var(--shadow-elevated) !important; }
+.shadow-window { box-shadow: var(--shadow-window) !important; }
+
+.fill-accent-blue { fill: var(--color-accent-blue) !important; }
+.fill-accent-orange { fill: var(--color-accent-orange) !important; }
+
+.ring-border { --tw-ring-color: var(--color-border); }
+.ring-surface { --tw-ring-color: var(--color-surface); }
+.ring-accent-blue\/30 { --tw-ring-color: color-mix(in srgb, var(--color-accent-blue) 30%, transparent); }
+
+.hover\:bg-surface-muted:hover { background-color: var(--color-surface-muted) !important; }
+.hover\:bg-canvas:hover { background-color: var(--color-canvas) !important; }
+.hover\:bg-border:hover { background-color: var(--color-border) !important; }
+.hover\:text-ink:hover { color: var(--color-text) !important; }
+.hover\:text-accent-blue:hover { color: var(--color-accent-blue) !important; }
+.hover\:text-accent-red:hover { color: var(--color-accent-red) !important; }
+.hover\:border-border:hover { border-color: var(--color-border) !important; }
+
+/* Page mist atmosphere — theme-driven blobs so glass has something to blur */
+.bg-page-atmosphere {
+  background-color: var(--color-page) !important;
+  background-image:
+    radial-gradient(ellipse 70% 50% at 12% 18%, var(--atm-blob-1), transparent 55%),
+    radial-gradient(ellipse 55% 45% at 88% 12%, var(--atm-blob-2), transparent 50%),
+    radial-gradient(ellipse 60% 50% at 70% 88%, var(--atm-blob-3), transparent 55%),
+    linear-gradient(160deg, var(--atm-base-from) 0%, var(--atm-base-mid) 55%, var(--atm-base-to) 100%) !important;
+  background-attachment: fixed;
+}
+
+/* Frosted glass surfaces (web approximation — selective elevation only) */
+.bg-glass {
+  background-color: var(--color-glass) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+.bg-glass-strong {
+  background-color: var(--color-glass-strong) !important;
+  backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(170%);
+  -webkit-backdrop-filter: blur(calc(var(--glass-blur) + 6px)) saturate(170%);
+}
+
+.border-glass {
+  border-color: var(--color-glass-border) !important;
+}
+
+/* Themed native selects — closed control matches glass UI */
+.ui-select {
+  color-scheme: light;
+  background-color: var(--color-glass) !important;
+  color: var(--color-text) !important;
+  border-color: var(--color-glass-border) !important;
+  backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(160%);
+}
+
+.ui-select:hover {
+  border-color: var(--color-border-strong) !important;
+}
+
+.ui-select:focus {
+  border-color: var(--color-border-strong) !important;
+}
+
+.ui-select option,
+.ui-select optgroup {
+  background-color: var(--color-surface);
+  color: var(--color-text);
+}
+
+html.dark .ui-select,
+.dark .ui-select {
+  color-scheme: dark;
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .ui-select {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background-color: var(--color-surface) !important;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .bg-glass,
+  .bg-glass-strong,
+  .bg-sidebar,
+  .bg-rail {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+  .bg-glass {
+    background-color: var(--color-surface) !important;
+  }
+  .bg-glass-strong {
+    background-color: var(--color-surface) !important;
+  }
+  .bg-sidebar {
+    background-color: var(--color-surface) !important;
+  }
+  .bg-rail {
+    background-color: var(--color-surface) !important;
+  }
+  .bg-page-atmosphere {
+    background-image: none !important;
+    background-color: var(--color-page) !important;
+  }
+}
+
+/* Subtle, ultra-clean scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
