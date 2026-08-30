@@ -8,16 +8,24 @@ on:
 jobs:
   publish:
     runs-on: ubuntu-latest
+    # Trusted Publishing (OIDC) — no NPM_TOKEN. Requires the package to already
+    # exist on npmjs.com with a Trusted Publisher pointed at this workflow file.
     permissions:
       contents: write # gh release create
-      id-token: write # npm provenance
+      id-token: write # npm OIDC + provenance
     steps:
       - uses: actions/checkout@v4
 
+      # Node 22+ with npm >= 11.5.1 is required for Trusted Publishing OIDC.
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           registry-url: "https://registry.npmjs.org"
+
+      - name: Ensure npm supports Trusted Publishing
+        run: |
+          npm install -g npm@^11.5.1
+          npm --version
 
       - name: Install frontend dependencies
         run: npm ci
@@ -54,10 +62,10 @@ jobs:
           else
             TAG=latest
           fi
-          echo "Publishing $VERSION with --tag $TAG"
+          echo "Publishing $VERSION with --tag $TAG (Trusted Publishing / OIDC)"
+          # No NODE_AUTH_TOKEN — npm exchanges the Actions OIDC token with the registry.
+          # --provenance is automatic under Trusted Publishing; keep it explicit.
           npm publish ./release --provenance --access public --tag "$TAG"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         env:
@@ -69,7 +77,12 @@ jobs:
           if [[ "$VERSION" == *-* ]]; then
             EXTRA_FLAGS+=(--prerelease)
           fi
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --generate-notes \
-            "${EXTRA_FLAGS[@]}"
+          # Idempotent: skip if this tag already has a GitHub Release (e.g. re-run).
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "GitHub Release $TAG already exists — skipping create"
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --generate-notes \
+              "${EXTRA_FLAGS[@]}"
+          fi
