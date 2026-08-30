@@ -1,34 +1,49 @@
 services:
-  mongo:
-    image: mongo:7
-    restart: unless-stopped
-    volumes:
-      - simplete_mongo:/data/db
-    ports:
-      - "27017:27017"
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+  # Optional local MongoDB — leave commented out when using MongoDB Atlas
+  # (or any external URI) via MONGODB_URI.
+  #
+  # mongo:
+  #   image: mongo:7
+  #   restart: unless-stopped
+  #   volumes:
+  #     - simplete_mongo:/data/db
+  #   ports:
+  #     - "27017:27017"
+  #   healthcheck:
+  #     test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
 
+  # Single service: Fastify serves /api, /mcp, /docs, and the built SPA.
   api:
     build:
-      context: ./server
+      context: .
+      dockerfile: server/Dockerfile
     restart: unless-stopped
-    depends_on:
-      mongo:
-        condition: service_healthy
+    # Uncomment if you enable the local mongo service above:
+    # depends_on:
+    #   mongo:
+    #     condition: service_healthy
     env_file:
       - ./server/.env.example
     environment:
-      MONGODB_URI: mongodb://mongo:27017/simplete
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: 4000
+      WEB_ROOT: /app/web
+      # Required: Atlas URI or local Mongo, e.g.
+      #   MONGODB_URI=mongodb+srv://user:pass@cluster/simplete
+      #   MONGODB_URI=mongodb://mongo:27017/simplete   (with mongo service enabled)
+      MONGODB_URI: ${MONGODB_URI:?Set MONGODB_URI to your MongoDB Atlas or local connection string}
       COOKIE_SECRET: ${COOKIE_SECRET:-change-me-in-production-please}
-      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
-      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:4000,127.0.0.1:4000,api:4000}
       PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:4000}
+      MCP_ALLOWED_HOSTS: ${MCP_ALLOWED_HOSTS:-localhost:4000,127.0.0.1:4000}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-http://localhost:4000}
+      # CORS is unused when WEB_ROOT is set (same-origin SPA).
     ports:
       - "4000:4000"
 
-volumes:
-  simplete_mongo:
+# Uncomment with the mongo service above:
+# volumes:
+#   simplete_mongo:

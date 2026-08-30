@@ -99,4 +99,6 @@ From the repo root:
 docker compose up -d
 ```
 
-See the root README for the full self-hosting guide.
+See the root README for the full self-hosting guide. Docker Compose builds a
+single image that serves the SPA from Fastify (`WEB_ROOT`); set `MONGODB_URI`
+to Atlas or uncomment the local `mongo` service in `docker-compose.yml`.

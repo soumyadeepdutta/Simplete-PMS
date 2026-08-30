@@ -4,8 +4,8 @@ Modern project management for self-hosted teams — Kanban, timeline, overview, 
 
 Built with **React 18**, **TypeScript**, **Tailwind CSS**, **Fastify**, and **MongoDB**.
 
-> **Beta (`0.1.0-beta.x`)** — the portable `npx simplete-pms` install path is new.
-> APIs and config may still change before 1.0. Feedback and bug reports welcome in
+> **Beta (`0.1.0-beta.x`)** — install with `npm install -g simplete-pms@beta` or run via
+> `npx simplete-pms@beta`. APIs and config may still change before 1.0. Feedback welcome in
 > [Issues](https://github.com/soumyadeepdutta/Simplete-PMS/issues).
 
 ![Kanban board](./images/tasks-white.png)
@@ -51,15 +51,50 @@ Counts, completion, pipeline breakdown, and recent tasks.
 
 ## Quick start
 
-The fastest way to run Simplete: one command, any machine with **Node.js 20+**, no Docker.
+The fastest way to run Simplete: any machine with **Node.js 20+**, no Docker.
+
+### One-shot (`npx`)
 
 ```bash
 npx simplete-pms@beta --mongodb-uri "mongodb://127.0.0.1:27017/simplete"
 ```
 
+### Install globally
+
+```bash
+npm install -g simplete-pms@beta
+simplete-pms --mongodb-uri "mongodb://127.0.0.1:27017/simplete"
+```
+
+Later runs can omit the URI (it is saved after the first successful start):
+
+```bash
+simplete-pms
+```
+
+### Install in a project
+
+```bash
+npm install simplete-pms@beta
+npx simplete-pms --mongodb-uri "mongodb://127.0.0.1:27017/simplete"
+```
+
+Or add a script in your `package.json`:
+
+```json
+{
+  "scripts": {
+    "simplete": "simplete-pms --mongodb-uri mongodb://127.0.0.1:27017/simplete"
+  }
+}
+```
+
+Then `npm run simplete`.
+
 That serves the built SPA and the API from a single port. On first run it prompts for the
-Mongo URI if you omit `--mongodb-uri`, and persists it (plus a generated cookie secret) so
-subsequent runs just need `npx simplete-pms@beta`. Open the printed URL (default
+Mongo URI if you omit `--mongodb-uri`, and persists it (plus a generated cookie secret) under
+your OS config directory (`%APPDATA%\simplete-pms` on Windows, `~/.config/simplete-pms` on
+Linux, `~/Library/Application Support/simplete-pms` on macOS). Open the printed URL (default
 [http://127.0.0.1:4000](http://127.0.0.1:4000)) and create the owner account.
 
 ```text
@@ -68,10 +103,14 @@ Options:
   --host <host>         Bind address (default: 127.0.0.1)
   --port <port>         Port to listen on (default: 4000)
   --open                Open the app in your default browser once ready
+  --help                Show help
+  --version             Print the installed version
 ```
 
 No MongoDB handy? Any free-tier [MongoDB Atlas](https://www.mongodb.com/atlas) cluster works —
 just pass its connection string as `--mongodb-uri`.
+
+Use the `@beta` dist-tag until 1.0 ships (`@latest` is empty until then).
 
 <details>
 <summary><strong>Run from source (development)</strong></summary>
@@ -141,12 +180,19 @@ again, and the app's first-run screen lets you re-create the owner account.
 
 ## Docker
 
+Single container: Fastify serves the API, MCP, docs, **and** the built SPA on port 4000.
+Point `MONGODB_URI` at Atlas (or any MongoDB). Local Mongo is optional — uncomment the
+`mongo` service in [`docker-compose.yml`](./docker-compose.yml) if you want it.
+
 ```bash
-# From repo root — MongoDB + API on port 4000
-docker compose up -d
+# From repo root
+export MONGODB_URI="mongodb+srv://user:pass@cluster.mongodb.net/simplete"
+# Windows PowerShell: $env:MONGODB_URI = "mongodb+srv://..."
+docker compose up -d --build
 ```
 
-Serve Vite `dist/` with any static host and point it at the API. For local UI against Docker, keep `npm run dev` with the default proxy.
+Open [http://localhost:4000](http://localhost:4000). For day-to-day UI development against
+a running API, keep using `npm run dev` (Vite proxy) instead.
 
 ---
 
