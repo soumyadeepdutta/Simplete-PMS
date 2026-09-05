@@ -59,7 +59,7 @@ export const Navbar: React.FC = () => {
               </div>
               <div className="hidden sm:block">
                 <h1 className="text-sm font-bold text-ink tracking-tight flex items-center gap-1.5">
-                  <span>Simplete</span>
+                  <span>Simplete PMS</span>
                   <span className="text-[10px] font-mono uppercase tracking-widest text-accent-blue bg-accent-blue-soft px-1.5 py-0.5 rounded-md border border-border">
                     Glass
                   </span>
@@ -97,7 +97,10 @@ export const Navbar: React.FC = () => {
                     <span className="flex items-center gap-2 truncate flex-1 min-w-0">
                       <span
                         className="w-2 h-2 rounded-full shrink-0"
-                        style={{ backgroundColor: proj.color, color: proj.color }}
+                        style={{
+                          backgroundColor: proj.color || '#3B82F6',
+                          color: proj.color || '#3B82F6',
+                        }}
                       />
                       <span className="truncate">{proj.name}</span>
                     </span>

@@ -30,6 +30,22 @@ export function cols(): Collections {
   return collections;
 }
 
+export async function clearDatabase(dbInstance?: Db): Promise<{ clearedCollections: string[] }> {
+  const targetDb = dbInstance || getDb();
+  const collectionsList = await targetDb.collections();
+  const clearedCollections: string[] = [];
+
+  for (const collection of collectionsList) {
+    await collection.deleteMany({});
+    clearedCollections.push(collection.collectionName);
+  }
+
+  const activeCols = getCollections(targetDb);
+  await ensureIndexes(activeCols);
+
+  return { clearedCollections };
+}
+
 export async function closeDb(): Promise<void> {
   if (client) {
     await client.close();
@@ -38,3 +54,4 @@ export async function closeDb(): Promise<void> {
     collections = null;
   }
 }
+

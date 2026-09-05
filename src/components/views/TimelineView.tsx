@@ -1,7 +1,9 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useKanban } from '../../context/KanbanContext';
 import { PriorityBadge, TagBadge } from '../ui/Badge';
 import { AvatarGroup } from '../ui/Avatar';
+import { Button } from '../ui/Button';
+import { MilestonesModal } from '../common/MilestonesModal';
 import { formatDisplayDate, getDueStatus } from '../../utils/dateUtils';
 import { Calendar, Flag } from 'lucide-react';
 import { cn } from '../../utils/cn';
@@ -9,6 +11,7 @@ import type { Task } from '../../types/kanban';
 
 export const TimelineView: React.FC = () => {
   const { activeProject, filteredTasks, setSelectedTaskId } = useKanban();
+  const [isMilestonesModalOpen, setIsMilestonesModalOpen] = useState(false);
 
   const groups = useMemo(() => {
     const milestones = [...(activeProject?.milestones ?? [])].sort((a, b) => a.order - b.order);
@@ -103,6 +106,22 @@ export const TimelineView: React.FC = () => {
   return (
     <div className="flex-1 overflow-y-auto p-4 sm:p-6">
       <div className="max-w-3xl mx-auto space-y-6">
+        <div className="flex items-center justify-between pb-3 border-b border-border/40">
+          <div>
+            <h2 className="text-sm font-semibold text-ink">Project Timeline</h2>
+            <p className="text-[11px] text-ink-muted">Milestones and scheduled deliverables</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsMilestonesModalOpen(true)}
+            className="text-xs flex items-center gap-1.5"
+          >
+            <Flag className="w-3.5 h-3.5 text-accent-blue" />
+            <span>Manage Milestones</span>
+          </Button>
+        </div>
+
         {!hasAny ? (
           <div className="text-center py-16 text-ink-muted text-sm">No tasks to show on the timeline.</div>
         ) : null}
@@ -138,6 +157,11 @@ export const TimelineView: React.FC = () => {
           </section>
         )}
       </div>
+
+      <MilestonesModal
+        isOpen={isMilestonesModalOpen}
+        onClose={() => setIsMilestonesModalOpen(false)}
+      />
     </div>
   );
 };

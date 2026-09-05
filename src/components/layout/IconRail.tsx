@@ -5,6 +5,7 @@ import {
   Sun,
   Moon,
   PanelLeftOpen,
+  PanelTopOpen,
   KeyRound,
   LogOut,
   Lock,
@@ -16,7 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useKanban } from '../../context/KanbanContext';
 import { cn } from '../../utils/cn';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
-import { MembersModal } from '../auth/MembersModal';
+import { Avatar } from '../ui/Avatar';
 
 const railBtn =
   'p-2.5 rounded-xl text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors';
@@ -25,19 +26,22 @@ const railBtnActive = 'p-2.5 rounded-xl text-accent-blue bg-accent-blue-soft tra
 interface IconRailProps {
   sidebarCollapsed?: boolean;
   onToggleSidebar?: () => void;
+  topbarCollapsed?: boolean;
+  onToggleTopbar?: () => void;
   onOpenTokens?: () => void;
 }
 
 export const IconRail: React.FC<IconRailProps> = ({
   sidebarCollapsed = false,
   onToggleSidebar,
+  topbarCollapsed = false,
+  onToggleTopbar,
   onOpenTokens,
 }) => {
   const { isDark, setTheme, theme } = useTheme();
   const { logout, user, can } = useAuth();
   const { workspaceMode, setWorkspaceMode } = useKanban();
   const [passwordOpen, setPasswordOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState(false);
 
   const cycleTheme = () => {
     if (theme === 'light') setTheme('dark');
@@ -48,21 +52,21 @@ export const IconRail: React.FC<IconRailProps> = ({
   const onProjects = workspaceMode === 'project';
   const onMyTasks = workspaceMode === 'my-tasks';
   const onAudit = workspaceMode === 'audit';
+  const onMembers = workspaceMode === 'members';
 
   return (
     <>
       <aside className="w-16 bg-rail border-r border-border flex flex-col items-center py-4 justify-between shrink-0 select-none z-20">
         <div className="flex flex-col items-center gap-6">
-          <div
-            className="w-10 h-10 rounded-full bg-ink text-surface font-bold text-lg flex items-center justify-center shadow-card cursor-default dark:bg-surface-muted dark:text-ink dark:border dark:border-border overflow-hidden"
-            title={user?.name}
-          >
-            {user?.avatar ? (
-              <img src={user.avatar} alt="" className="w-full h-full object-cover" />
-            ) : (
-              (user?.name?.[0] || 'S').toUpperCase()
-            )}
-          </div>
+          {user ? (
+            <Avatar user={user} size="lg" className="w-10 h-10 text-base" />
+          ) : (
+            <div
+              className="w-10 h-10 rounded-full bg-surface-muted text-ink font-bold text-base flex items-center justify-center shadow-card border border-border select-none"
+            >
+              S
+            </div>
+          )}
 
           <nav className="flex flex-col items-center gap-3 mt-1">
             <div className="relative">
@@ -99,14 +103,19 @@ export const IconRail: React.FC<IconRailProps> = ({
             </div>
 
             {(can('member:invite') || can('member:update') || can('member:remove')) && (
-              <button
-                className={railBtn}
-                title="Members"
-                type="button"
-                onClick={() => setMembersOpen(true)}
-              >
-                <Users className="w-5 h-5" />
-              </button>
+              <div className="relative">
+                {onMembers && (
+                  <span className="absolute -left-3.5 top-1/2 -translate-y-1/2 w-1.5 h-6 bg-accent-blue rounded-r-full" />
+                )}
+                <button
+                  className={cn(onMembers ? railBtnActive : railBtn, 'relative')}
+                  title="Members & Permissions"
+                  type="button"
+                  onClick={() => setWorkspaceMode('members')}
+                >
+                  <Users className={cn('w-5 h-5', onMembers && 'fill-accent-blue')} />
+                </button>
+              </div>
             )}
 
             {can('audit:read') && (
@@ -133,6 +142,17 @@ export const IconRail: React.FC<IconRailProps> = ({
                 onClick={onToggleSidebar}
               >
                 <PanelLeftOpen className="w-5 h-5" />
+              </button>
+            )}
+
+            {topbarCollapsed && onProjects && onToggleTopbar && (
+              <button
+                className={railBtn}
+                title="Expand topbar"
+                type="button"
+                onClick={onToggleTopbar}
+              >
+                <PanelTopOpen className="w-5 h-5" />
               </button>
             )}
           </nav>
@@ -177,7 +197,6 @@ export const IconRail: React.FC<IconRailProps> = ({
       </aside>
 
       <ChangePasswordModal isOpen={passwordOpen} onClose={() => setPasswordOpen(false)} />
-      <MembersModal isOpen={membersOpen} onClose={() => setMembersOpen(false)} />
     </>
   );
 };

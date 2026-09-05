@@ -13,6 +13,7 @@ Usage:
 
 Options:
   --mongodb-uri <uri>   MongoDB connection string (persisted after first run)
+  --clear-db            Clear/delete all documents from MongoDB database
   --host <host>         Bind address (default: 127.0.0.1)
   --port <port>         Port to listen on (default: 4000)
   --open                Open the app in your default browser once ready
@@ -46,6 +47,7 @@ function parseCliArgs(argv: string[]) {
     args: argv,
     options: {
       'mongodb-uri': { type: 'string' },
+      'clear-db': { type: 'boolean', default: false },
       host: { type: 'string' },
       port: { type: 'string' },
       open: { type: 'boolean', default: false },
@@ -166,6 +168,20 @@ export async function run(argv: string[] = process.argv.slice(2)): Promise<void>
   const mongodbUri = await resolveMongoUri(args['mongodb-uri']);
   console.log('Checking MongoDB connection...');
   await preflightMongo(mongodbUri);
+
+  if (args['clear-db']) {
+    console.log('Clearing MongoDB database...');
+    process.env.MONGODB_URI = mongodbUri;
+    const { connectDb, clearDatabase, closeDb } = await import('../db/client.js');
+    const { db } = await connectDb();
+    const { clearedCollections } = await clearDatabase(db);
+    if (clearedCollections.length === 0) {
+      console.log('[db] Database had no existing collections to clear.');
+    } else {
+      console.log(`[db] Successfully cleared ${clearedCollections.length} collections: ${clearedCollections.join(', ')}`);
+    }
+    await closeDb();
+  }
 
   const cookieSecret = process.env.COOKIE_SECRET || (await ensureCookieSecret());
   const { publicBaseUrl, allowedHosts, allowedOrigins } = deriveNetworkConfig(host, port);

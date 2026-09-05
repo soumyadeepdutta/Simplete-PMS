@@ -1,8 +1,13 @@
 import React, { useState } from 'react';
+import { ArrowLeft } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../services/api';
 
-export const LoginScreen: React.FC = () => {
+interface LoginScreenProps {
+  onBack?: () => void;
+}
+
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onBack }) => {
   const { login, setup, needsSetup, error: authError } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -36,8 +41,19 @@ export const LoginScreen: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-page-atmosphere p-4">
       <div className="w-full max-w-md bg-glass-strong border border-glass rounded-2xl shadow-elevated p-8">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-ink-muted hover:text-ink transition-colors group"
+          >
+            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <span>Back to overview</span>
+          </button>
+        )}
+
         <div className="mb-6">
-          <h1 className="text-xl font-semibold text-ink tracking-tight">Simplete</h1>
+          <h1 className="text-xl font-semibold text-ink tracking-tight">Simplete PMS</h1>
           <p className="text-sm text-ink-muted mt-1">
             {needsSetup
               ? 'Create the owner account for this self-hosted instance.'

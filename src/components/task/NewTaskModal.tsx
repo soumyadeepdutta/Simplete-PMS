@@ -4,7 +4,8 @@ import { Modal } from '../ui/Modal';
 import { Select } from '../ui/Select';
 import { Priority } from '../../types/kanban';
 import { Avatar } from '../ui/Avatar';
-import { Calendar, Plus, X } from 'lucide-react';
+import { Calendar, Plus, X, Flag } from 'lucide-react';
+import { formatDisplayDate } from '../../utils/dateUtils';
 
 export const NewTaskModal: React.FC = () => {
  const {
@@ -26,6 +27,7 @@ export const NewTaskModal: React.FC = () => {
  const [startDate, setStartDate] = useState('');
  const [dueDate, setDueDate] = useState('');
  const [estimatedHours, setEstimatedHours] = useState<number | undefined>(undefined);
+ const [milestoneId, setMilestoneId] = useState('');
  const [subtasks, setSubtasks] = useState<string[]>([]);
  const [newSubtaskInput, setNewSubtaskInput] = useState('');
 
@@ -54,11 +56,13 @@ export const NewTaskModal: React.FC = () => {
  dueDate: dueDate || undefined,
  estimatedHours: estimatedHours,
  subtasks: subtasks.map((s) => ({ title: s })),
+ milestoneId: milestoneId || undefined,
  });
 
  // Reset & close
  setTitle('');
  setDescription('');
+ setMilestoneId('');
  setSelectedAssigneeIds([]);
  setSelectedTagIds([]);
  setStartDate('');
@@ -152,6 +156,29 @@ export const NewTaskModal: React.FC = () => {
  </Select>
  </div>
  </div>
+
+ {/* Target Milestone */}
+ {activeProject.milestones && activeProject.milestones.length > 0 && (
+ <div>
+ <label className="block text-xs font-semibold text-ink-muted mb-1.5 flex items-center gap-1.5">
+ <Flag className="w-3.5 h-3.5 text-accent-blue" /> Target Milestone
+ </label>
+ <Select
+ fullWidth
+ value={milestoneId}
+ onChange={(e) => setMilestoneId(e.target.value)}
+ className="sm:text-sm px-3.5 py-2"
+ >
+ <option value="">No milestone (unassigned)</option>
+ {activeProject.milestones.map((m) => (
+ <option key={m.id} value={m.id}>
+ {m.name}
+ {m.dueDate ? ` · due ${formatDisplayDate(m.dueDate)}` : ''}
+ </option>
+ ))}
+ </Select>
+ </div>
+ )}
 
  {/* Description */}
  <div>

@@ -11,13 +11,15 @@ import { TableView } from './components/views/TableView';
 import { ListView } from './components/views/ListView';
 import { MetricsView } from './components/views/MetricsView';
 import { TimelineView } from './components/views/TimelineView';
-import { OverviewView } from './components/views/OverviewView';
 import { MyTasksView } from './components/views/MyTasksView';
 import { AuditView } from './components/views/AuditView';
+import { MembersView } from './components/views/MembersView';
 import { TaskDetailModal } from './components/task/TaskDetailModal';
 import { NewTaskModal } from './components/task/NewTaskModal';
 import { Toast } from './components/ui/Toast';
+import { GlobalTooltip } from './components/ui/Tooltip';
 import { LoginScreen } from './components/auth/LoginScreen';
+import { LandingPage } from './components/landing/LandingPage';
 import { TokenManagerModal } from './components/auth/TokenManagerModal';
 import { readMigratedLocalStorage } from './services/storageService';
 
@@ -38,12 +40,34 @@ const KanbanAppContent: React.FC = () => {
       return false;
     }
   });
+  const [topbarCollapsed, setTopbarCollapsed] = useState(() => {
+    try {
+      return (
+        readMigratedLocalStorage('simplete_topbar_collapsed', 'taskorbit_topbar_collapsed') ===
+        '1'
+      );
+    } catch {
+      return false;
+    }
+  });
 
   const toggleSidebar = () => {
     setSidebarCollapsed((prev) => {
       const next = !prev;
       try {
         localStorage.setItem('simplete_sidebar_collapsed', next ? '1' : '0');
+      } catch {
+        /* ignore */
+      }
+      return next;
+    });
+  };
+
+  const toggleTopbar = () => {
+    setTopbarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('simplete_topbar_collapsed', next ? '1' : '0');
       } catch {
         /* ignore */
       }
@@ -71,12 +95,15 @@ const KanbanAppContent: React.FC = () => {
 
   const isMyTasks = workspaceMode === 'my-tasks';
   const isAudit = workspaceMode === 'audit';
+  const isMembers = workspaceMode === 'members';
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden bg-canvas text-ink">
       <IconRail
         sidebarCollapsed={sidebarCollapsed}
         onToggleSidebar={toggleSidebar}
+        topbarCollapsed={topbarCollapsed}
+        onToggleTopbar={toggleTopbar}
         onOpenTokens={() => setTokensOpen(true)}
       />
 
@@ -91,12 +118,19 @@ const KanbanAppContent: React.FC = () => {
           <MyTasksView />
         ) : isAudit ? (
           <AuditView />
+        ) : isMembers ? (
+          <MembersView />
         ) : (
           <>
             <ProjectHeader
               onNewProjectClick={() => can('project:create') && setIsNewProjectOpen(true)}
+              collapsed={topbarCollapsed}
+              onToggleCollapse={toggleTopbar}
             />
-            <FilterBar />
+            <FilterBar
+              topbarCollapsed={topbarCollapsed}
+              onToggleTopbar={toggleTopbar}
+            />
 
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               {activeView === 'board' && <KanbanBoard />}
@@ -104,7 +138,6 @@ const KanbanAppContent: React.FC = () => {
               {activeView === 'list' && <ListView />}
               {activeView === 'metrics' && <MetricsView />}
               {activeView === 'timeline' && <TimelineView />}
-              {activeView === 'overview' && <OverviewView />}
             </div>
           </>
         )}
@@ -196,6 +229,21 @@ const KanbanAppContent: React.FC = () => {
 
 const AuthenticatedApp: React.FC = () => {
   const { user, loading, needsSetup } = useAuth();
+  const [unauthView, setUnauthView] = useState<'landing' | 'login'>(() => {
+    return typeof window !== 'undefined' && window.location.hash === '#login' ? 'login' : 'landing';
+  });
+
+  React.useEffect(() => {
+    const handleHashChange = () => {
+      if (window.location.hash === '#login') {
+        setUnauthView('login');
+      } else if (window.location.hash === '#home' || window.location.hash === '') {
+        setUnauthView('landing');
+      }
+    };
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   if (loading) {
     return (
@@ -206,12 +254,33 @@ const AuthenticatedApp: React.FC = () => {
   }
 
   if (!user || needsSetup) {
-    return <LoginScreen />;
+    if (unauthView === 'login') {
+      return (
+        <LoginScreen
+          onBack={() => {
+            window.location.hash = '';
+            setUnauthView('landing');
+          }}
+        />
+      );
+    }
+    return (
+      <LandingPage
+        onSignIn={() => {
+          window.location.hash = '#login';
+          setUnauthView('login');
+        }}
+      />
+    );
   }
 
   return (
     <KanbanProvider>
-      <KanbanAppContent />
+      <div className="fixed inset-0 overflow-hidden flex items-center justify-center p-0 sm:p-4 md:p-6 select-none">
+        <div className="w-full h-full sm:h-[95vh] sm:rounded-3xl shadow-window overflow-hidden bg-glass-strong border border-glass flex flex-col">
+          <KanbanAppContent />
+        </div>
+      </div>
     </KanbanProvider>
   );
 };
@@ -222,6 +291,7 @@ export function App() {
       <AuthProvider>
         <AuthenticatedApp />
       </AuthProvider>
+      <GlobalTooltip />
     </ThemeProvider>
   );
 }

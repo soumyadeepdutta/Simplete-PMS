@@ -1,6 +1,6 @@
 export type Priority = 'urgent' | 'high' | 'medium' | 'low';
 
-export type ViewMode = 'board' | 'table' | 'list' | 'metrics' | 'timeline' | 'overview';
+export type ViewMode = 'board' | 'table' | 'list' | 'metrics' | 'timeline';
 
 /** Workspace RBAC role (server). Legacy demo data may still put a job title here. */
 export type RbacRole = 'owner' | 'admin' | 'member' | 'viewer';
@@ -102,7 +102,7 @@ export interface MyTask extends Task {
   projectColor: string;
 }
 
-export type WorkspaceMode = 'project' | 'my-tasks' | 'audit';
+export type WorkspaceMode = 'project' | 'my-tasks' | 'audit' | 'members';
 
 export interface Column {
   id: string;

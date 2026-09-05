@@ -1,8 +1,9 @@
 import React from 'react';
 import { useKanban } from '../../context/KanbanContext';
 import { Avatar } from '../ui/Avatar';
-import { Layers, Activity } from 'lucide-react';
-import { getDueStatus } from '../../utils/dateUtils';
+import { Layers, Activity, Flag, Calendar } from 'lucide-react';
+import { getDueStatus, formatDisplayDate } from '../../utils/dateUtils';
+import { cn } from '../../utils/cn';
 
 export const MetricsView: React.FC = () => {
  const { activeProject } = useKanban();
@@ -75,7 +76,7 @@ export const MetricsView: React.FC = () => {
  {completionPct}%
  </div>
  <div className="text-xs text-accent-green font-medium mt-1">
- {doneTasks} of {totalTasks} milestones shipped
+ {doneTasks} of {totalTasks} tasks completed
  </div>
  </div>
  <div className="w-full bg-canvas h-2 rounded-full overflow-hidden z-10 shadow-inner">
@@ -283,6 +284,112 @@ export const MetricsView: React.FC = () => {
  </div>
  </div>
  </div>
+
+ {/* Milestone Delivery & Progress */}
+ {activeProject.milestones && activeProject.milestones.length > 0 && (
+ <div className="p-6 bg-glass rounded-2xl border border-glass shadow-card space-y-5">
+ <div className="flex items-center justify-between">
+ <h3 className="text-sm font-semibold text-ink flex items-center gap-2.5">
+ <Flag className="w-4 h-4 text-accent-blue" />
+ Milestone Delivery & Progress
+ </h3>
+ <span className="text-[11px] font-mono text-ink-muted bg-canvas px-2 py-1 rounded border border-border">
+ {activeProject.milestones.length} MILESTONES
+ </span>
+ </div>
+
+ <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pt-1">
+ {activeProject.milestones.map((milestone) => {
+ const mTasks = activeProject.tasks.filter((t) => t.milestoneId === milestone.id);
+ const mDone = mTasks.filter((t) => {
+ const col = activeProject.columns.find((c) => c.id === t.columnId);
+ return (
+ col?.title.toLowerCase().includes('done') ||
+ col?.title.toLowerCase().includes('shipped')
+ );
+ }).length;
+ const mTotal = mTasks.length;
+ const mPct = mTotal === 0 ? 0 : Math.round((mDone / mTotal) * 100);
+ const isOverdue =
+ Boolean(milestone.dueDate &&
+ getDueStatus(milestone.dueDate) === 'overdue' &&
+ (mTotal === 0 || mDone < mTotal));
+ const isComplete = mTotal > 0 && mDone === mTotal;
+
+ return (
+ <div
+ key={milestone.id}
+ className="p-4 rounded-xl bg-surface-muted border border-border flex flex-col justify-between space-y-3 hover:border-border-strong transition-all"
+ >
+ <div className="flex items-start justify-between gap-2">
+ <div className="min-w-0">
+ <h4 className="text-sm font-semibold text-ink truncate flex items-center gap-1.5">
+ <Flag className="w-3.5 h-3.5 text-accent-blue shrink-0" />
+ {milestone.name}
+ </h4>
+ {milestone.description && (
+ <p className="text-[11px] text-ink-muted line-clamp-1 mt-0.5">
+ {milestone.description}
+ </p>
+ )}
+ </div>
+ {isComplete ? (
+ <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-green-soft text-accent-green border border-accent-green/20 shrink-0">
+ Shipped
+ </span>
+ ) : isOverdue ? (
+ <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-red-soft text-accent-red border border-accent-red/20 shrink-0">
+ Overdue
+ </span>
+ ) : milestone.dueDate ? (
+ <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-accent-blue-soft text-accent-blue border border-accent-blue/20 shrink-0">
+ On Track
+ </span>
+ ) : (
+ <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-canvas text-ink-muted border border-border shrink-0">
+ Planned
+ </span>
+ )}
+ </div>
+
+ <div className="space-y-1.5">
+ <div className="flex items-center justify-between text-xs">
+ <span className="text-[11px] text-ink-muted">
+ {mDone} of {mTotal} tasks completed
+ </span>
+ <span className="font-mono text-[11px] font-semibold text-ink">
+ {mPct}%
+ </span>
+ </div>
+ <div className="w-full bg-canvas h-2 rounded-full overflow-hidden shadow-inner">
+ <div
+ className={cn(
+ 'h-full rounded-full transition-all duration-700',
+ isComplete
+ ? 'bg-accent-green'
+ : isOverdue
+ ? 'bg-accent-red'
+ : 'bg-accent-blue'
+ )}
+ style={{ width: `${mPct}%` }}
+ />
+ </div>
+ </div>
+
+ {milestone.dueDate && (
+ <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] text-ink-subtle">
+ <span className="flex items-center gap-1">
+ <Calendar className="w-3 h-3" />
+ Target: {formatDisplayDate(milestone.dueDate)}
+ </span>
+ </div>
+ )}
+ </div>
+ );
+ })}
+ </div>
+ </div>
+ )}
 
  {/* Team Member Workload */}
  <div className="p-6 bg-glass rounded-2xl border border-glass shadow-card space-y-5">

@@ -1,5 +1,5 @@
 {
-  "name": "simplete",
+  "name": "simplete-pms",
   "private": true,
   "version": "0.1.0-beta.0",
   "description": "Self-hosted project management (Kanban, timeline, MCP) — single command, no Docker required.",
@@ -27,6 +27,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
+    "db:clear": "npm --prefix server run db:clear",
     "build:release": "node scripts/build-release.mjs",
     "prepublishOnly": "node -e \"console.error('Refusing to publish the dev workspace root. Run npm run build:release and publish ./release instead.'); process.exit(1)\""
   },

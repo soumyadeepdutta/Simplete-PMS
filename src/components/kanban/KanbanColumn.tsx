@@ -30,12 +30,14 @@ interface KanbanColumnProps {
   tasks: Task[];
   index: number;
   dragHandleProps?: DraggableProvidedDragHandleProps | null;
+  droppableId?: string;
 }
 
 export const KanbanColumn: React.FC<KanbanColumnProps> = ({
   column,
   tasks,
   dragHandleProps,
+  droppableId,
 }) => {
   const { openNewTaskModal, deleteColumn, updateColumn } = useKanban();
   const { can } = useAuth();
@@ -245,7 +247,7 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
         </div>
       )}
 
-      <Droppable droppableId={column.id} type="task" isDropDisabled={!canMoveTasks}>
+      <Droppable droppableId={droppableId || column.id} type="task" isDropDisabled={!canMoveTasks}>
         {(provided, snapshot) => (
           <div
             ref={provided.innerRef}

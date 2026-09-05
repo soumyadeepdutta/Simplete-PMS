@@ -1,4 +1,4 @@
-# Simplete
+# Simplete PMS
 
 Modern project management for self-hosted teams — Kanban, timeline, overview, RBAC, and **MCP** so AI agents can work your board over HTTP.
 

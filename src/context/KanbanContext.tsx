@@ -12,6 +12,7 @@ import {
   Project,
   Task,
   Column,
+  Milestone,
   ViewMode,
   FilterState,
   Priority,
@@ -50,6 +51,8 @@ interface KanbanContextType {
   setFilters: React.Dispatch<React.SetStateAction<FilterState>>;
   resetFilters: () => void;
   filteredTasks: Task[];
+  groupByMilestone: boolean;
+  setGroupByMilestone: React.Dispatch<React.SetStateAction<boolean>>;
   selectedTaskId: string | null;
   setSelectedTaskId: (id: string | null) => void;
   selectedColumnForNewTask: string | null;
@@ -77,6 +80,7 @@ interface KanbanContextType {
     dueDate?: string;
     estimatedHours?: number;
     subtasks?: { title: string }[];
+    milestoneId?: string;
   }) => Task;
   updateTask: (taskId: string, updates: Partial<Task>) => void;
   deleteTask: (taskId: string) => void;
@@ -107,6 +111,16 @@ interface KanbanContextType {
     }
   ) => Promise<void>;
   deleteTag: (projectId: string, tagId: string) => Promise<void>;
+  createMilestone: (
+    projectId: string,
+    body: { name: string; description?: string; dueDate?: string }
+  ) => Promise<void>;
+  updateMilestone: (
+    projectId: string,
+    milestoneId: string,
+    body: { name?: string; description?: string | null; dueDate?: string | null }
+  ) => Promise<void>;
+  deleteMilestone: (projectId: string, milestoneId: string) => Promise<void>;
 
   exportData: () => void;
   importData: (jsonStr: string) => boolean;
@@ -162,6 +176,26 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [myTasks, setMyTasks] = useState<MyTask[]>([]);
   const [myTasksLoading, setMyTasksLoading] = useState(false);
   const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
+  const [groupByMilestone, setGroupByMilestone] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('kanban_group_by_milestone') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const handleSetGroupByMilestone: React.Dispatch<React.SetStateAction<boolean>> = useCallback((val) => {
+    setGroupByMilestone((prev) => {
+      const next = typeof val === 'function' ? (val as (p: boolean) => boolean)(prev) : val;
+      try {
+        localStorage.setItem('kanban_group_by_milestone', String(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
   const [selectedColumnForNewTask, setSelectedColumnForNewTask] = useState<string | null>(null);
@@ -350,7 +384,9 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       list = list.filter((t) => filters.columnIds.includes(t.columnId));
     }
     if (filters.milestoneIds && filters.milestoneIds.length > 0) {
-      list = list.filter((t) => t.milestoneId && filters.milestoneIds!.includes(t.milestoneId));
+      list = list.filter((t) =>
+        filters.milestoneIds!.some((id) => (id === 'none' ? !t.milestoneId : t.milestoneId === id))
+      );
     }
     if (filters.blockedOnly) {
       list = list.filter((t) => (t.blockers ?? []).some((b) => !b.done));
@@ -499,6 +535,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     dueDate?: string;
     estimatedHours?: number;
     subtasks?: { title: string }[];
+    milestoneId?: string;
   }): Task => {
     if (!activeProject) throw new Error('No active project');
 
@@ -521,6 +558,8 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       spentHours: 0,
       order: activeProject.tasks.filter((t) => t.columnId === data.columnId).length,
       activities: [],
+      milestoneId: data.milestoneId,
+      milestone: activeProject.milestones?.find((m) => m.id === data.milestoneId),
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -578,9 +617,17 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (p.id !== activeProject.id) return p;
         return {
           ...p,
-          tasks: p.tasks.map((t) =>
-            t.id === taskId ? { ...t, ...updates, updatedAt: new Date().toISOString() } : t
-          ),
+          tasks: p.tasks.map((t) => {
+            if (t.id !== taskId) return t;
+            const updatedTask = { ...t, ...updates, updatedAt: new Date().toISOString() };
+            if (updates.milestoneId !== undefined) {
+              updatedTask.milestoneId = updates.milestoneId ?? undefined;
+              updatedTask.milestone = updates.milestoneId
+                ? p.milestones?.find((m) => m.id === updates.milestoneId)
+                : undefined;
+            }
+            return updatedTask;
+          }),
         };
       })
     );
@@ -596,6 +643,7 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     if (updates.subtasks !== undefined) body.subtasks = updates.subtasks;
     if (updates.assignees !== undefined) body.assigneeIds = updates.assignees.map((a) => a.id);
     if (updates.tags !== undefined) body.tagIds = updates.tags.map((t) => t.id);
+    if (updates.milestoneId !== undefined) body.milestoneId = updates.milestoneId;
 
     if (Object.keys(body).length === 0) return;
 
@@ -888,6 +936,87 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const createMilestone = async (
+    projectId: string,
+    body: { name: string; description?: string; dueDate?: string }
+  ) => {
+    try {
+      noteLocalWrite();
+      const milestone = await projectApi.createMilestone(projectId, body);
+      setProjects((prev) =>
+        prev.map((p) =>
+          p.id === projectId
+            ? {
+                ...p,
+                milestones: [...(p.milestones ?? []), milestone].sort((a, b) => a.order - b.order),
+              }
+            : p
+        )
+      );
+      showToast(`Milestone "${milestone.name}" created`, 'success');
+    } catch (e) {
+      handleApiError(e);
+      throw e;
+    }
+  };
+
+  const updateMilestone = async (
+    projectId: string,
+    milestoneId: string,
+    body: { name?: string; description?: string | null; dueDate?: string | null }
+  ) => {
+    try {
+      noteLocalWrite();
+      const milestone = await projectApi.updateMilestone(projectId, milestoneId, body);
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== projectId) return p;
+          const nextMilestones = (p.milestones ?? [])
+            .map((m) => (m.id === milestoneId ? milestone : m))
+            .sort((a, b) => a.order - b.order);
+          return {
+            ...p,
+            milestones: nextMilestones,
+            tasks: p.tasks.map((task) =>
+              task.milestoneId === milestoneId
+                ? { ...task, milestone }
+                : task
+            ),
+          };
+        })
+      );
+      showToast(`Milestone "${milestone.name}" updated`, 'success');
+    } catch (e) {
+      handleApiError(e);
+      throw e;
+    }
+  };
+
+  const deleteMilestone = async (projectId: string, milestoneId: string) => {
+    try {
+      noteLocalWrite();
+      await projectApi.deleteMilestone(projectId, milestoneId);
+      setProjects((prev) =>
+        prev.map((p) => {
+          if (p.id !== projectId) return p;
+          return {
+            ...p,
+            milestones: (p.milestones ?? []).filter((m) => m.id !== milestoneId),
+            tasks: p.tasks.map((task) =>
+              task.milestoneId === milestoneId
+                ? { ...task, milestoneId: undefined, milestone: undefined }
+                : task
+            ),
+          };
+        })
+      );
+      showToast('Milestone deleted', 'info');
+    } catch (e) {
+      handleApiError(e);
+      throw e;
+    }
+  };
+
   const exportData = () => {
     const jsonStr = JSON.stringify(projects, null, 2);
     const blob = new Blob([jsonStr], { type: 'application/json' });
@@ -902,25 +1031,35 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   const importData = (jsonStr: string): boolean => {
     try {
-      const parsed = JSON.parse(jsonStr);
+      const data = JSON.parse(jsonStr);
+      if (!Array.isArray(data) || data.length === 0) {
+        showToast('Invalid backup file: expected a JSON array of projects.', 'error');
+        return false;
+      }
       noteLocalWrite();
       void projectApi
-        .importProjects(parsed)
-        .then((imported) => {
-          setProjects(imported);
-          setActiveProjectIdState(imported[0]?.id || '');
-          showToast('Project data imported successfully!', 'success');
+        .importProjects(data)
+        .then((importedProjects) => {
+          setProjects(importedProjects);
+          if (importedProjects.length > 0) {
+            setActiveProjectIdState(importedProjects[0].id);
+          }
+          showToast(`Successfully imported ${importedProjects.length} project(s)`, 'success');
         })
-        .catch((e) => handleApiError(e, 'Failed to import'));
+        .catch((e) => {
+          handleApiError(e);
+        });
       return true;
     } catch {
-      showToast('Failed to parse JSON file', 'error');
+      showToast('Failed to parse backup file. Please ensure it is valid JSON.', 'error');
       return false;
     }
   };
 
   const resetDefaultData = () => {
-    showToast('Demo reset is unavailable on the server. Import a backup instead.', 'info');
+    storageService.resetToDefault();
+    showToast('Reset action requested. Re-fetching project list.', 'info');
+    void refreshProjects();
   };
 
   return (
@@ -942,6 +1081,8 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         setFilters,
         resetFilters,
         filteredTasks,
+        groupByMilestone,
+        setGroupByMilestone: handleSetGroupByMilestone,
         selectedTaskId,
         setSelectedTaskId,
         selectedColumnForNewTask,
@@ -967,6 +1108,9 @@ export const KanbanProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         createTag,
         updateTag,
         deleteTag,
+        createMilestone,
+        updateMilestone,
+        deleteMilestone,
         exportData,
         importData,
         resetDefaultData,

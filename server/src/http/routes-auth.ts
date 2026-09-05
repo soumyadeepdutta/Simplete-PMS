@@ -17,8 +17,7 @@ import {
   setSessionCookie,
 } from './auth-helpers.js';
 
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80';
+const DEFAULT_AVATAR = '';
 
 export async function registerAuthRoutes(app: FastifyInstance): Promise<void> {
   app.get('/api/setup/status', async () => {

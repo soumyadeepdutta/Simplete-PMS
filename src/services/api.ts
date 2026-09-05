@@ -245,6 +245,7 @@ export const api = {
       dueDate?: string;
       estimatedHours?: number;
       subtasks?: { title: string }[];
+      milestoneId?: string;
     }
   ) =>
     request<Task>(`/api/projects/${projectId}/tasks`, {
@@ -266,6 +267,7 @@ export const api = {
       estimatedHours?: number | null;
       spentHours?: number;
       subtasks?: Task['subtasks'];
+      milestoneId?: string | null;
     }
   ) =>
     request<Task>(`/api/projects/${projectId}/tasks/${taskId}`, {

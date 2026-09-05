@@ -79,6 +79,7 @@ export const RolePermissionsPanel: React.FC = () => {
   const isDisabled = (role: RoleKey, perm: Permission): boolean => {
     if (role === 'owner') return true;
     if (perm === 'settings:manage') return true;
+    if (perm === 'project:read' || perm === 'task:read') return true;
     return false;
   };
 
@@ -198,7 +199,9 @@ export const RolePermissionsPanel: React.FC = () => {
                                 ? 'Owner always has all permissions'
                                 : perm === 'settings:manage'
                                   ? 'Reserved for owner'
-                                  : undefined
+                                  : perm === 'project:read' || perm === 'task:read'
+                                    ? 'Required permission'
+                                    : undefined
                             }
                             onChange={() => {
                               if (role !== 'owner') toggle(role, perm);

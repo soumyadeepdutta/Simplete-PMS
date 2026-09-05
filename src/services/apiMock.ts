@@ -3,7 +3,7 @@
  * Kept as projectApi for drop-in use from KanbanContext.
  */
 import { api } from './api';
-import type { Column, MyTask, Project, Task } from '../types/kanban';
+import type { Column, Milestone, MyTask, Project, Task } from '../types/kanban';
 
 export const projectApi = {
   async getProjects(): Promise<Project[]> {
@@ -72,6 +72,7 @@ export const projectApi = {
       dueDate?: string;
       estimatedHours?: number;
       subtasks?: { title: string }[];
+      milestoneId?: string;
     }
   ): Promise<Task> {
     return api.createTask(projectId, task);
@@ -96,6 +97,31 @@ export const projectApi = {
 
   async deleteTask(projectId: string, taskId: string): Promise<void> {
     await api.deleteTask(projectId, taskId);
+  },
+
+  async listMilestones(
+    projectId: string
+  ): Promise<(Milestone & { taskCount: number; completedCount: number })[]> {
+    return api.listMilestones(projectId);
+  },
+
+  async createMilestone(
+    projectId: string,
+    body: { name: string; description?: string; dueDate?: string }
+  ): Promise<Milestone> {
+    return api.createMilestone(projectId, body);
+  },
+
+  async updateMilestone(
+    projectId: string,
+    milestoneId: string,
+    body: { name?: string; description?: string | null; dueDate?: string | null }
+  ): Promise<Milestone> {
+    return api.updateMilestone(projectId, milestoneId, body);
+  },
+
+  async deleteMilestone(projectId: string, milestoneId: string): Promise<void> {
+    await api.deleteMilestone(projectId, milestoneId);
   },
 
   async createColumn(

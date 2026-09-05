@@ -16,8 +16,7 @@ import {
   type UpdateMemberInput,
 } from '../shared/schemas.js';
 
-const DEFAULT_AVATAR =
-  'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200&auto=format&fit=crop&q=80';
+const DEFAULT_AVATAR = '';
 
 /** Active (non-disabled) workspace members only. */
 export async function listMembers(ctx: AuthContext) {

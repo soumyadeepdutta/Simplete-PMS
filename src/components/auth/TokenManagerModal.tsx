@@ -54,11 +54,11 @@ export const TokenManagerModal: React.FC<{ isOpen: boolean; onClose: () => void 
   isOpen,
   onClose,
 }) => {
-  const { user } = useAuth();
+  const { user, permissions } = useAuth();
   const { projects } = useKanban();
   const allowedScopes = useMemo(
-    () => permissionsForRole(user?.role || 'viewer'),
-    [user?.role]
+    () => (permissions.length > 0 ? permissions : permissionsForRole(user?.role || 'viewer')),
+    [permissions, user?.role]
   );
 
   const [tokens, setTokens] = useState<TokenRow[]>([]);

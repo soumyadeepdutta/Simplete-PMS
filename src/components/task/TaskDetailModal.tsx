@@ -312,16 +312,40 @@ export const TaskDetailModal: React.FC = () => {
  </div>
  </div>
 
- {/* Milestone (read-only) */}
- {task.milestone && (
+ {/* Milestone */}
+ {activeProject.milestones && activeProject.milestones.length > 0 && (
  <div className="space-y-2">
  <span className="text-xs font-medium text-ink-muted flex items-center gap-1.5">
  <Flag className="w-4 h-4 text-accent-blue" /> Milestone
  </span>
+ {canUpdate ? (
+ <Select
+ fullWidth
+ value={task.milestoneId || ''}
+ onChange={(e) => {
+ const nextId = e.target.value;
+ updateTask(task.id, {
+ milestoneId: nextId ? nextId : undefined,
+ });
+ }}
+ className="text-xs"
+ >
+ <option value="">No milestone (unassigned)</option>
+ {activeProject.milestones.map((m) => (
+ <option key={m.id} value={m.id}>
+ {m.name}
+ {m.dueDate ? ` · due ${formatDisplayDate(m.dueDate)}` : ''}
+ </option>
+ ))}
+ </Select>
+ ) : task.milestone ? (
  <p className="text-xs text-ink px-2.5 py-1.5 rounded-lg bg-surface-muted border border-border">
  {task.milestone.name}
  {task.milestone.dueDate ? ` · due ${formatDisplayDate(task.milestone.dueDate)}` : ''}
  </p>
+ ) : (
+ <p className="text-xs text-ink-subtle italic px-2.5 py-1.5">No milestone assigned</p>
+ )}
  </div>
  )}
 

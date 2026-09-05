@@ -40,22 +40,50 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const [isArchiveOpen, setIsArchiveOpen] = useState(false);
   const [isThemeOpen, setIsThemeOpen] = useState(true);
 
-  const getProjectIcon = (icon?: string) => {
+  const getProjectIcon = (icon?: string, color?: string) => {
+    const iconColor = color || '#3B82F6';
     switch (icon) {
       case 'Star':
-        return <Star className="w-3.5 h-3.5 text-accent-orange fill-accent-orange" />;
+        return (
+          <Star
+            className="w-3.5 h-3.5 shrink-0"
+            style={{ color: iconColor, fill: iconColor }}
+          />
+        );
       case 'Triangle':
-        return <Triangle className="w-3.5 h-3.5 text-accent-green" />;
+        return (
+          <Triangle
+            className="w-3.5 h-3.5 shrink-0"
+            style={{ color: iconColor, fill: `${iconColor}33` }}
+          />
+        );
       case 'Square':
-        return <Square className="w-3.5 h-3.5 text-accent-blue" />;
+        return (
+          <Square
+            className="w-3.5 h-3.5 shrink-0"
+            style={{ color: iconColor, fill: `${iconColor}33` }}
+          />
+        );
       case 'Circle':
+        return (
+          <Circle
+            className="w-3.5 h-3.5 shrink-0"
+            style={{ color: iconColor, fill: `${iconColor}33` }}
+          />
+        );
       default:
-        return <Circle className="w-3.5 h-3.5 text-accent-purple" />;
+        return (
+          <span
+            className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
+            style={{ backgroundColor: iconColor }}
+          />
+        );
     }
   };
 
   const favoriteProjects = projects.filter((p) => p.category === 'favorites');
   const allProjects = projects.filter((p) => p.category !== 'favorites' && p.category !== 'archive');
+  const archivedProjects = projects.filter((p) => p.category === 'archive');
 
   const sectionBtn =
     'flex items-center gap-1.5 w-full text-[11px] font-semibold text-ink-muted hover:text-ink uppercase tracking-wider py-1';
@@ -131,10 +159,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                         tabIndex={collapsed ? -1 : 0}
                       >
                         {isActive && (
-                          <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-accent-blue rounded-r-full" />
+                          <span
+                            className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                            style={{ backgroundColor: proj.color || '#3B82F6' }}
+                          />
                         )}
                         <span className="flex items-center gap-2.5 truncate">
-                          {getProjectIcon(proj.icon)}
+                          {getProjectIcon(proj.icon, proj.color)}
                           <span className="truncate">{proj.name}</span>
                         </span>
                       </button>
@@ -168,10 +199,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                           tabIndex={collapsed ? -1 : 0}
                         >
                           {isActive && (
-                            <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 bg-accent-blue rounded-r-full" />
+                            <span
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                              style={{ backgroundColor: proj.color || '#3B82F6' }}
+                            />
                           )}
                           <span className="flex items-center gap-2.5 truncate">
-                            {getProjectIcon(proj.icon)}
+                            {getProjectIcon(proj.icon, proj.color)}
                             <span className="truncate">{proj.name}</span>
                           </span>
 
@@ -202,17 +236,47 @@ export const Sidebar: React.FC<SidebarProps> = ({
               )}
             </div>
 
-            <div>
-              <button
-                onClick={() => setIsArchiveOpen(!isArchiveOpen)}
-                className={sectionBtn}
-                type="button"
-                tabIndex={collapsed ? -1 : 0}
-              >
-                {isArchiveOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                <span>Archive</span>
-              </button>
-            </div>
+            {archivedProjects.length > 0 && (
+              <div>
+                <button
+                  onClick={() => setIsArchiveOpen(!isArchiveOpen)}
+                  className={sectionBtn}
+                  type="button"
+                  tabIndex={collapsed ? -1 : 0}
+                >
+                  {isArchiveOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  <span>Archive ({archivedProjects.length})</span>
+                </button>
+
+                {isArchiveOpen && (
+                  <div className="mt-1 space-y-0.5 opacity-70">
+                    {archivedProjects.map((proj) => {
+                      const isActive = proj.id === activeProject?.id;
+                      return (
+                        <button
+                          key={proj.id}
+                          onClick={() => setActiveProjectId(proj.id)}
+                          className={projectBtn(isActive)}
+                          type="button"
+                          tabIndex={collapsed ? -1 : 0}
+                        >
+                          {isActive && (
+                            <span
+                              className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                              style={{ backgroundColor: proj.color || '#3B82F6' }}
+                            />
+                          )}
+                          <span className="flex items-center gap-2.5 truncate">
+                            {getProjectIcon(proj.icon, proj.color)}
+                            <span className="truncate">{proj.name}</span>
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

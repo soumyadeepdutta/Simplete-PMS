@@ -10,6 +10,7 @@ import React, {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { Check } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 type Align = 'start' | 'end';
@@ -358,3 +359,63 @@ export const DropdownLabel: React.FC<{ children: React.ReactNode; className?: st
 export const DropdownSeparator: React.FC<{ className?: string }> = ({ className }) => (
   <div className={cn('border-t border-border my-1', className)} role="separator" />
 );
+
+export interface DropdownCheckboxItemProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  checked: boolean;
+  onCheckedChange?: (checked: boolean) => void;
+  children: React.ReactNode;
+}
+
+export const DropdownCheckboxItem = React.forwardRef<HTMLButtonElement, DropdownCheckboxItemProps>(
+  (
+    {
+      checked,
+      onCheckedChange,
+      onClick,
+      className,
+      children,
+      disabled,
+      ...props
+    },
+    ref
+  ) => {
+    return (
+      <button
+        ref={ref}
+        type="button"
+        role="menuitemcheckbox"
+        aria-checked={checked}
+        disabled={disabled}
+        className={cn(
+          'w-full px-3 py-1.5 text-xs text-left flex items-center gap-2.5 transition-colors cursor-pointer rounded-lg',
+          'hover:bg-surface-muted focus-visible:outline-none focus-visible:bg-surface-muted',
+          disabled && 'opacity-50 cursor-not-allowed',
+          checked && 'text-ink font-medium',
+          !checked && 'text-ink-muted',
+          className
+        )}
+        onClick={(e) => {
+          onClick?.(e);
+          if (e.defaultPrevented || disabled) return;
+          onCheckedChange?.(!checked);
+        }}
+        {...props}
+      >
+        <div
+          className={cn(
+            'w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-all',
+            checked
+              ? 'bg-accent-blue border-accent-blue text-white shadow-xs'
+              : 'border-border bg-canvas hover:border-border-strong'
+          )}
+        >
+          {checked && <Check className="w-2.5 h-2.5 stroke-[3]" />}
+        </div>
+        <div className="flex-1 flex items-center justify-between gap-2 min-w-0">
+          {children}
+        </div>
+      </button>
+    );
+  }
+);
+DropdownCheckboxItem.displayName = 'DropdownCheckboxItem';

@@ -16,13 +16,22 @@ interface KanbanCardProps {
 }
 
 export const KanbanCard: React.FC<KanbanCardProps> = ({ task, index, isDragDisabled = false }) => {
-  const { setSelectedTaskId } = useKanban();
+  const { setSelectedTaskId, activeProject } = useKanban();
 
   const completedSubtasks = task.subtasks.filter((s) => s.completed).length;
   const totalSubtasks = task.subtasks.length;
   const dueStatus = getDueStatus(task.dueDate);
   const commentCount = task.activities.filter((a) => a.type === 'comment').length;
   const attachmentCount = task.attachments?.length ?? task.attachmentsCount ?? 0;
+
+  const column = activeProject?.columns.find((c) => c.id === task.columnId);
+  const isDone =
+    column?.title.toLowerCase().includes('done') || column?.title.toLowerCase().includes('shipped');
+  const isMilestoneOverdue = Boolean(
+    !isDone &&
+      task.milestone?.dueDate &&
+      getDueStatus(task.milestone.dueDate) === 'overdue'
+  );
 
   return (
     <Draggable draggableId={task.id} index={index} isDragDisabled={isDragDisabled}>
@@ -43,9 +52,28 @@ export const KanbanCard: React.FC<KanbanCardProps> = ({ task, index, isDragDisab
           <div className="flex items-center justify-between gap-2 mb-2.5">
             <div className="flex items-center gap-1.5 flex-wrap">
               {task.milestone && (
-                <span className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-surface-muted text-ink-muted border border-border">
-                  <Flag className="w-2.5 h-2.5" />
-                  {task.milestone.name}
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-md border transition-colors',
+                    isMilestoneOverdue
+                      ? 'bg-accent-red-soft text-accent-red border-accent-red/25'
+                      : 'bg-surface-muted text-ink-muted border-border'
+                  )}
+                  title={
+                    task.milestone.dueDate
+                      ? `Milestone: ${task.milestone.name} · Target: ${formatDisplayDate(
+                          task.milestone.dueDate
+                        )}${isMilestoneOverdue ? ' (Overdue)' : ''}`
+                      : `Milestone: ${task.milestone.name}`
+                  }
+                >
+                  <Flag className={cn('w-2.5 h-2.5 shrink-0', isMilestoneOverdue ? 'text-accent-red' : 'text-accent-blue')} />
+                  <span className="truncate max-w-[120px]">{task.milestone.name}</span>
+                  {isMilestoneOverdue && (
+                    <span className="text-[9px] font-bold uppercase tracking-wider ml-0.5 text-accent-red">
+                      Overdue
+                    </span>
+                  )}
                 </span>
               )}
               {task.blockers && task.blockers.some((b) => !b.done) && (

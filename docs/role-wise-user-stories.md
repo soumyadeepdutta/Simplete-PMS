@@ -1,6 +1,6 @@
-# Simplete — Role-Wise User Stories
+# Simplete PMS — Role-Wise User Stories
 
-**Product:** Simplete — self-hosted project management & Kanban platform  
+**Product:** Simplete PMS — self-hosted project management & Kanban platform  
 **Sources:** `README.md`, `server/src/auth/rbac.ts`, `server/src/shared/schemas.ts`, REST/MCP routes, React SPA  
 **Document type:** Role-based user stories with acceptance criteria inferred from implementation  
 **Last derived from codebase:** 2026-08-29  

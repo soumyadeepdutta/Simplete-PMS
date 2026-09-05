@@ -15,6 +15,8 @@ import {
   Trash2,
   Users,
   ScrollText,
+  Flag,
+  PanelTopClose,
 } from 'lucide-react';
 import { AvatarGroup } from '../ui/Avatar';
 import { Button } from '../ui/Button';
@@ -27,21 +29,26 @@ import {
 } from '../ui/Dropdown';
 import { ExportImportModal } from '../common/ExportImportModal';
 import { EditProjectModal } from '../common/EditProjectModal';
-import { MembersModal } from '../auth/MembersModal';
+import { MilestonesModal } from '../common/MilestonesModal';
 import { ViewMode } from '../../types/kanban';
 import { cn } from '../../utils/cn';
 
 const PROJECT_TABS: { id: ViewMode; label: string }[] = [
   { id: 'board', label: 'Tasks' },
   { id: 'timeline', label: 'Timeline' },
-  { id: 'overview', label: 'Overview' },
 ];
 
 interface ProjectHeaderProps {
   onNewProjectClick?: () => void;
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick }) => {
+export const ProjectHeader: React.FC<ProjectHeaderProps> = ({
+  onNewProjectClick,
+  collapsed = false,
+  onToggleCollapse,
+}) => {
   const {
     activeProject,
     activeView,
@@ -55,7 +62,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
 
   const [isBackupOpen, setIsBackupOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [membersOpen, setMembersOpen] = useState(false);
+  const [isMilestonesOpen, setIsMilestonesOpen] = useState(false);
 
   if (!activeProject) return null;
 
@@ -82,11 +89,21 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
 
   return (
     <>
-      <header className="bg-glass border-b border-glass shrink-0 z-20">
+      <header
+        className={cn(
+          'bg-glass border-b border-glass shrink-0 z-20 transition-all duration-300 ease-in-out',
+          collapsed ? 'max-h-0 opacity-0 overflow-hidden border-b-0 pointer-events-none' : 'max-h-96 opacity-100'
+        )}
+        aria-hidden={collapsed}
+      >
         <div className="px-5 sm:px-6 pt-5 pb-3 flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight truncate">
-              {activeProject.name}
+            <h1 className="text-xl sm:text-2xl font-bold text-ink tracking-tight truncate flex items-center gap-2.5">
+              <span
+                className="w-3 h-3 rounded-full shrink-0 shadow-sm"
+                style={{ backgroundColor: activeProject.color || '#3B82F6' }}
+              />
+              <span className="truncate">{activeProject.name}</span>
             </h1>
             <p className="mt-0.5 text-xs text-ink-muted truncate">
               {activeProject.key} · {activeProject.description || 'Project workspace'}
@@ -137,6 +154,10 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
                   <Database className="w-3.5 h-3.5" aria-hidden="true" />
                   Backup & Export
                 </DropdownItem>
+                <DropdownItem onSelect={() => setIsMilestonesOpen(true)}>
+                  <Flag className="w-3.5 h-3.5" aria-hidden="true" />
+                  Milestones
+                </DropdownItem>
                 {can('project:update') && (
                   <DropdownItem onSelect={() => setEditOpen(true)}>
                     <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
@@ -144,7 +165,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
                   </DropdownItem>
                 )}
                 {(can('member:invite') || can('member:update') || can('member:remove')) && (
-                  <DropdownItem onSelect={() => setMembersOpen(true)}>
+                  <DropdownItem onSelect={() => setWorkspaceMode('members')}>
                     <Users className="w-3.5 h-3.5" aria-hidden="true" />
                     Members
                   </DropdownItem>
@@ -177,7 +198,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
               type="button"
               onClick={() => {
                 if (can('member:invite') || can('member:update') || can('member:remove')) {
-                  setMembersOpen(true);
+                  setWorkspaceMode('members');
                 }
               }}
               className={cn(
@@ -202,6 +223,18 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
               >
                 <span className="hidden sm:inline">New Task</span>
               </Button>
+            )}
+
+            {onToggleCollapse && (
+              <button
+                type="button"
+                onClick={onToggleCollapse}
+                className="p-2 rounded-xl text-ink-subtle hover:text-ink hover:bg-surface-muted transition-colors shrink-0"
+                title="Collapse topbar"
+                tabIndex={collapsed ? -1 : 0}
+              >
+                <PanelTopClose className="w-4 h-4" />
+              </button>
             )}
           </div>
         </div>
@@ -294,7 +327,7 @@ export const ProjectHeader: React.FC<ProjectHeaderProps> = ({ onNewProjectClick 
 
       <ExportImportModal isOpen={isBackupOpen} onClose={() => setIsBackupOpen(false)} />
       <EditProjectModal isOpen={editOpen} onClose={() => setEditOpen(false)} />
-      <MembersModal isOpen={membersOpen} onClose={() => setMembersOpen(false)} />
+      <MilestonesModal isOpen={isMilestonesOpen} onClose={() => setIsMilestonesOpen(false)} />
     </>
   );
 };

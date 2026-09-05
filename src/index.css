@@ -65,57 +65,66 @@
 
   html.dark,
   .dark {
-    --color-page: #0B1220;
-    --color-canvas: #111827;
-    --color-surface: #1A2332;
-    --color-surface-muted: #1E293B;
-    --color-sidebar: rgba(15, 23, 42, 0.62);
-    --color-rail: rgba(15, 23, 42, 0.72);
-    --color-border: rgba(59, 130, 246, 0.14);
-    --color-border-strong: rgba(59, 130, 246, 0.26);
-    --color-text: #E8EEF6;
-    --color-text-muted: #94A3B8;
-    --color-text-subtle: #64748B;
-    --color-accent-blue: #3B82F6;
-    --color-accent-blue-soft: #1E3A5F;
-    --color-accent-green: #4ADE80;
-    --color-accent-green-soft: #14532D;
-    --color-accent-red: #FB7185;
-    --color-accent-red-soft: #7F1D1D;
-    --color-accent-orange: #FB923C;
-    --color-accent-orange-soft: #7C2D12;
-    --color-accent-purple: #A78BFA;
-    --color-accent-purple-soft: #4C1D95;
-    --color-accent-yellow: #FACC15;
-    --color-accent-yellow-soft: #713F12;
-    --color-glass: rgba(15, 23, 42, 0.62);
-    --color-glass-strong: rgba(15, 23, 42, 0.84);
-    --color-glass-border: rgba(255, 255, 255, 0.12);
-    --color-glass-highlight: rgba(255, 255, 255, 0.1);
+    /* Casual-professional dark obsidian glass */
+    --color-page: #0b0e14;
+    --color-canvas: #0f131d;
+    --color-surface: #151a26;
+    --color-surface-muted: #1c2232;
+    --color-sidebar: rgba(14, 18, 27, 0.72);
+    --color-rail: rgba(10, 13, 20, 0.82);
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-border-strong: rgba(255, 255, 255, 0.16);
+    --color-text: #f1f5f9;
+    --color-text-muted: #94a3b8;
+    --color-text-subtle: #64748b;
+    --color-accent-blue: #388bfd;
+    --color-accent-blue-soft: rgba(56, 139, 253, 0.15);
+    --color-accent-green: #34d399;
+    --color-accent-green-soft: rgba(52, 211, 153, 0.15);
+    --color-accent-red: #fb7185;
+    --color-accent-red-soft: rgba(251, 113, 133, 0.15);
+    --color-accent-orange: #fb923c;
+    --color-accent-orange-soft: rgba(251, 146, 60, 0.15);
+    --color-accent-purple: #a78bfa;
+    --color-accent-purple-soft: rgba(167, 139, 250, 0.15);
+    --color-accent-yellow: #facc15;
+    --color-accent-yellow-soft: rgba(250, 204, 21, 0.15);
+    /* Frosted glass fills */
+    --color-glass: rgba(18, 23, 34, 0.65);
+    --color-glass-strong: rgba(22, 28, 42, 0.82);
+    --color-glass-border: rgba(255, 255, 255, 0.09);
+    --color-glass-highlight: rgba(255, 255, 255, 0.12);
     --glass-blur: 24px;
+    /* Clean, tactile shadows with specular rim lighting */
     --shadow-card:
       inset 0 1px 0 var(--color-glass-highlight),
-      0 1px 2px rgba(0, 0, 0, 0.2),
-      0 10px 28px rgba(0, 0, 0, 0.35);
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      0 8px 24px -4px rgba(0, 0, 0, 0.35);
     --shadow-card-hover:
-      inset 0 1px 0 var(--color-glass-highlight),
-      0 4px 14px rgba(59, 130, 246, 0.08),
-      0 18px 40px rgba(0, 0, 0, 0.42);
+      inset 0 1px 0 rgba(255, 255, 255, 0.16),
+      0 6px 16px rgba(0, 0, 0, 0.25),
+      0 16px 36px -4px rgba(0, 0, 0, 0.45);
     --shadow-elevated:
       inset 0 1px 0 var(--color-glass-highlight),
-      0 12px 32px rgba(59, 130, 246, 0.06),
+      0 12px 32px rgba(0, 0, 0, 0.4),
       0 24px 56px rgba(0, 0, 0, 0.5);
     --shadow-window:
-      inset 0 1px 0 rgba(255, 255, 255, 0.08),
-      0 16px 48px rgba(0, 0, 0, 0.55);
-    --atm-blob-1: rgba(59, 130, 246, 0.16);
-    --atm-blob-2: rgba(37, 99, 235, 0.12);
-    --atm-blob-3: rgba(99, 102, 241, 0.1);
-    --atm-base-from: #0B1220;
-    --atm-base-mid: #111827;
-    --atm-base-to: #0B1220;
-    --scrollbar-thumb: rgba(59, 130, 246, 0.28);
-    --scrollbar-thumb-hover: rgba(59, 130, 246, 0.5);
+      inset 0 1px 0 rgba(255, 255, 255, 0.12),
+      0 20px 60px rgba(0, 0, 0, 0.55),
+      0 1px 3px rgba(0, 0, 0, 0.3);
+    /* Subtle organic atmosphere blobs (Icy default) */
+    --atm-blob-1: rgba(56, 139, 253, 0.14);
+    --atm-blob-2: rgba(99, 102, 241, 0.10);
+    --atm-blob-3: rgba(56, 189, 248, 0.08);
+    --atm-base-from: #0b0e14;
+    --atm-base-mid: #0f131d;
+    --atm-base-to: #0b0e14;
+    --scrollbar-thumb: rgba(255, 255, 255, 0.16);
+    --scrollbar-thumb-hover: rgba(255, 255, 255, 0.3);
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
